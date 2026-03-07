@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUFF自动化工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #00d4ff;
+            --secondary: #7c3aed;
+            --austin: #f59e0b;
+            --budapest: #10b981;
+            --bg-dark: #0f0f1a;
+            --bg-card: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #fff;
+            --text-muted: #888;
+        }
+        
+        :root.light-theme {
+            --primary: #0066ff;
+            --secondary: #7c3aed;
+            --austin: #f59e0b;
+            --budapest: #10b981;
+            --bg-dark: #f0f4f8;
+            --bg-card: rgba(0, 0, 0, 0.03);
+            --border: rgba(0, 0, 0, 0.1);
+            --text: #1a1a2e;
+            --text-muted: #666;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%);
+            min-height: 100vh;
+            color: var(--text);
+            position: relative;
+            overflow-x: hidden;
+            transition: background 0.3s ease;
+        }
+        
+        :root.light-theme body {
+            background: linear-gradient(135deg, #e0e7ff 0%, #f0f4f8 50%, #ffffff 100%);
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(124, 58, 237, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        :root.light-theme body::before {
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 102, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(124, 58, 237, 0.08) 0%, transparent 50%);
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 40px 0;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(124, 58, 237, 0.05));
+            border-radius: 24px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        :root.light-theme header {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.08), rgba(124, 58, 237, 0.08));
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        
+        h1 {
+            font-size: 2.8em;
+            background: linear-gradient(45deg, var(--primary), var(--secondary), #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            text-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+        }
+        
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1em;
+        }
+        
+        .theme-toggle {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .theme-toggle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .theme-toggle:hover::before {
+            left: 100%;
+        }
+        
+        .theme-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.5);
+        }
+        
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-tab {
+            padding: 14px 32px;
+            border: 2px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .nav-tab:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+        }
+        
+        .nav-tab.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-color: transparent;
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+        }
+        
+        .nav-tab.austin.active {
+            background: linear-gradient(135deg, var(--austin), #d97706);
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);
+        }
+        
+        .nav-tab.budapest.active {
+            background: linear-gradient(135deg, var(--budapest), #059669);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 25px;
+        }
+        
+        .btn-group-inline {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-clear {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-clear::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-clear:hover::before {
+            left: 100%;
+        }
+        
+        .btn-clear:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border-radius: 24px;
+            padding: 32px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 48px rgba(0, 212, 255, 0.15);
+        }
+        
+        .card.full {
+            grid-column: 1 / -1;
+        }
+        
+        .card h2 {
+            font-size: 1.6em;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .card h2::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 28px;
+            background: linear-gradient(180deg, var(--primary), var(--secondary));
+            border-radius: 3px;
+        }
+        
+        .form-group {
+            margin-bottom: 22px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            color: var(--text);
+            font-size: 1em;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+        
+        .form-group select {
+            cursor: pointer;
+            appearance: none;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1));
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2300d4ff'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 18px center;
+            background-size: 20px;
+            padding-right: 55px;
+        }
+        
+        .form-group select option {
+            background-color: #16213e;
+            color: #ffffff;
+            padding: 12px;
+        }
+        
+        :root.light-theme .form-group select option {
+            background-color: #ffffff;
+            color: #1a1a2e;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .input-number-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .input-number-wrapper input[type="number"]::-webkit-outer-spin-button,
+        .input-number-wrapper input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .input-number-wrapper input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
+        .number-btn {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .number-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+        }
+        
+        .number-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .input-number-wrapper input {
+            text-align: center;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 18px 36px;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.05em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn:hover::before {
+            left: 100%;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.5);
+        }
+        
+        .btn-austin {
+            background: linear-gradient(135deg, var(--austin), #d97706);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
+        
+        .btn-austin:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.5);
+        }
+        
+        .btn-budapest {
+            background: linear-gradient(135deg, var(--budapest), #059669);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-budapest:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .task-section {
+            margin-top: 30px;
+        }
+        
+        .task-list {
+            max-height: 700px;
+            overflow-y: auto;
+        }
+        
+        .task-item {
+            background: var(--bg-card);
+            border-radius: 18px;
+            padding: 28px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .task-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 212, 255, 0.2);
+        }
+        
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .task-title {
+            font-size: 1.15em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .task-status {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-pending {
+            background: #6b7280;
+        }
+        
+        .status-running {
+            background: #3b82f6;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-completed {
+            background: #10b981;
+        }
+        
+        .status-failed {
+            background: #ef4444;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .task-meta {
+            color: var(--text-muted);
+            font-size: 0.9em;
+            margin-bottom: 14px;
+        }
+        
+        .task-output {
+            background: #0a0a12;
+            border-radius: 12px;
+            padding: 18px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.88em;
+            max-height: 350px;
+            overflow-y: auto;
+            line-height: 1.7;
+        }
+        
+        .task-output-line {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        
+        .task-output-line:last-child {
+            border-bottom: none;
+        }
+        
+        .task-output-line.info {
+            color: #60a5fa;
+        }
+        
+        .task-output-line.success {
+            color: #34d399;
+        }
+        
+        .task-output-line.error {
+            color: #f87171;
+        }
+        
+        .task-output-line.warning {
+            color: #fbbf24;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+        
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.4;
+        }
+        
+        .history-item {
+            cursor: pointer;
+        }
+        
+        .history-item:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+        
+        .schedule-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn-delete {
+            padding: 8px 16px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .btn-delete:hover {
+            background: #dc2626;
+        }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid var(--border);
+        }
+        
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .modal .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .modal .btn {
+            width: auto;
+            flex: 1;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        @media (max-width: 1000px) {
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto; padding: 0 20px;">
+                <div style="text-align: left;">
+                    <h1 style="margin-bottom: 5px;">🎮 BUFF自动化工具</h1>
+                    <p class="subtitle" style="margin-bottom: 0;">涂鸦购买 · 挂件搜枪 · 历史记录 · 定时任务</p>
+                </div>
+                <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-text">黑夜模式</span>
+                </button>
+            </div>
+        </header>
+        
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="buyer">
+                <span>🎨</span> 涂鸦购买
+            </button>
+            <button class="nav-tab austin" data-tab="austin">
+                <span>🔍</span> Austin挂件
+            </button>
+            <button class="nav-tab budapest" data-tab="budapest">
+                <span>🔍</span> Budapest挂件
+            </button>
+            <button class="nav-tab" data-tab="history">
+                <span>📜</span> 历史记录
+            </button>
+            <button class="nav-tab" data-tab="schedule">
+                <span>⏰</span> 定时任务
+            </button>
+        </nav>
+        
+        <div class="tab-content active" id="tab-buyer">
+            <div class="card-grid">
+                <div class="card">
+                    <h2>参数设置</h2>
+                    <div class="form-group">
+                        <label>最大价格（元）</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('buyer-max-price', -0.01)">-</button>
+                            <input type="number" id="buyer-max-price" step="0.01" value="0.05" min="0">
+                            <button class="number-btn" onclick="adjustNumber('buyer-max-price', 0.01)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>最大购买数量</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('buyer-max-items', -1)">-</button>
+                            <input type="number" id="buyer-max-items" value="10" min="1">
+                            <button class="number-btn" onclick="adjustNumber('buyer-max-items', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="btn-group-inline">
+                        <button class="btn btn-primary" id="start-buyer">
+                            <span>🚀</span> 启动涂鸦购买
+                        </button>
+                        <button class="btn-clear" onclick="clearTasks('buyer')">
+                            <span>🗑️</span> 清空任务
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>任务列表</h2>
+                    <div class="task-list" id="task-list-buyer"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="tab-austin">
+            <div class="card-grid">
+                <div class="card">
+                    <h2>参数设置</h2>
+                    <div class="form-group">
+                        <label>最大价格（元）</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('austin-max-price', -0.01)">-</button>
+                            <input type="number" id="austin-max-price" step="0.01" value="0.3" min="0">
+                            <button class="number-btn" onclick="adjustNumber('austin-max-price', 0.01)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>最大页数</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('austin-max-pages', -1)">-</button>
+                            <input type="number" id="austin-max-pages" value="18" min="1" max="25">
+                            <button class="number-btn" onclick="adjustNumber('austin-max-pages', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>最大购买数量</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('austin-max-items', -1)">-</button>
+                            <input type="number" id="austin-max-items" value="10" min="1">
+                            <button class="number-btn" onclick="adjustNumber('austin-max-items', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="btn-group-inline">
+                        <button class="btn btn-austin" id="start-austin">
+                            <span>🚀</span> 启动Austin搜枪
+                        </button>
+                        <button class="btn-clear" onclick="clearTasks('austin')">
+                            <span>🗑️</span> 清空任务
+                        </button>
+                    </div>
+                </div>
+                <div class="card task-section">
+                    <h2>任务列表</h2>
+                    <div class="task-list" id="task-list-austin"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="tab-budapest">
+            <div class="card-grid">
+                <div class="card">
+                    <h2>参数设置</h2>
+                    <div class="form-group">
+                        <label>最大价格（元）</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('budapest-max-price', -0.01)">-</button>
+                            <input type="number" id="budapest-max-price" step="0.01" value="0.3" min="0">
+                            <button class="number-btn" onclick="adjustNumber('budapest-max-price', 0.01)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>最大页数</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('budapest-max-pages', -1)">-</button>
+                            <input type="number" id="budapest-max-pages" value="15" min="1" max="18">
+                            <button class="number-btn" onclick="adjustNumber('budapest-max-pages', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>最大购买数量</label>
+                        <div class="input-number-wrapper">
+                            <button class="number-btn" onclick="adjustNumber('budapest-max-items', -1)">-</button>
+                            <input type="number" id="budapest-max-items" value="10" min="1">
+                            <button class="number-btn" onclick="adjustNumber('budapest-max-items', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="btn-group-inline">
+                        <button class="btn btn-budapest" id="start-budapest">
+                            <span>🚀</span> 启动Budapest搜枪
+                        </button>
+                        <button class="btn-clear" onclick="clearTasks('budapest')">
+                            <span>🗑️</span> 清空任务
+                        </button>
+                    </div>
+                </div>
+                <div class="card task-section">
+                    <h2>任务列表</h2>
+                    <div class="task-list" id="task-list-budapest"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="tab-history">
+            <div class="card full">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h2 style="margin-bottom: 0;">历史任务记录</h2>
+                    <button class="btn-clear" onclick="clearHistory()">
+                        <span>🗑️</span> 清空记录
+                    </button>
+                </div>
+                <div class="task-list" id="history-list"></div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="tab-schedule">
+            <div class="card full">
+                <h2>定时任务管理</h2>
+                <div class="schedule-form">
+                    <div class="form-group">
+                        <label>任务类型</label>
+                        <select id="schedule-type">
+                            <option value="buyer">涂鸦购买</option>
+                            <option value="austin">Austin挂件</option>
+                            <option value="budapest">Budapest挂件</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>常用示例</label>
+                        <select id="cron-example-select" onchange="selectCronExample(this)">
+                            <option value="">-- 选择示例 --</option>
+                            <option value="0 * * * *">每小时执行一次 (0 * * * *)</option>
+                            <option value="0 */2 * * *">每2小时执行一次 (0 */2 * * *)</option>
+                            <option value="0 */30 * * *">每30分钟执行一次 (0 */30 * * *)</option>
+                            <option value="0 9 * * *">每天早上9点执行 (0 9 * * *)</option>
+                            <option value="0 18 * * *">每天下午6点执行 (0 18 * * *)</option>
+                            <option value="30 8 * * 1">每周一早上8点30分 (30 8 * * 1)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cron表达式</label>
+                        <input type="text" id="schedule-cron" placeholder="例如: 0 * * * * (每小时执行)">
+                    </div>
+                    <button class="btn btn-primary" id="add-schedule">添加定时任务</button>
+                </div>
+                <div id="schedule-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="cookie-modal">
+        <div class="modal">
+            <h3>🔑 Cookie已过期</h3>
+            <div class="form-group">
+                <label>请输入新的Cookie</label>
+                <textarea id="new-cookie" placeholder="粘贴BUFF网站的Cookie"></textarea>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="closeCookieModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveCookie()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let tasks = {};
+        let currentTab = 'buyer';
+        let renderedTaskIds = new Set();
+        
+        function getTaskTypeLabel(type) {
+            const labels = {
+                'buyer': '涂鸦购买',
+                'charm_austin': 'Austin挂件',
+                'charm_budapest': 'Budapest挂件'
+            };
+            return labels[type] || type;
+        }
+        
+        function getStatusLabel(status) {
+            const labels = {
+                'pending': '等待中',
+                'running': '运行中',
+                'completed': '已完成',
+                'failed': '失败'
+            };
+            return labels[status] || status;
+        }
+        
+        function formatOutputLine(line) {
+            let type = '';
+            const lower = line.toLowerCase();
+            if (lower.includes('成功') || lower.includes('ok') || lower.includes('completed')) {
+                type = 'success';
+            } else if (lower.includes('错误') || lower.includes('失败') || lower.includes('error') || lower.includes('exception')) {
+                type = 'error';
+            } else if (lower.includes('警告') || lower.includes('warning')) {
+                type = 'warning';
+            } else if (lower.includes('===') || lower.includes('开始')) {
+                type = 'info';
+            }
+            return `<div class="task-output-line ${type}">${escapeHtml(line)}</div>`;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function renderTask(task, containerId) {
+            if (renderedTaskIds.has(task.id)) {
+                return;
+            }
+            
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            renderedTaskIds.add(task.id);
+            
+            const taskEl = document.createElement('div');
+            taskEl.className = 'task-item';
+            taskEl.id = `task-${task.id}`;
+            taskEl.innerHTML = `
+                <div class="task-header">
+                    <span class="task-title">${getTaskTypeLabel(task.type)}</span>
+                    <span class="task-status status-${task.status}">${getStatusLabel(task.status)}</span>
+                </div>
+                <div class="task-meta">
+                    创建时间: ${task.created_at} | ID: ${task.id}
+                </div>
+                <div class="task-output" id="output-${task.id}">${task.output.map(formatOutputLine).join('')}</div>
+            `;
+            
+            container.insertBefore(taskEl, container.firstChild);
+        }
+        
+        function updateTask(task) {
+            const taskEl = document.getElementById(`task-${task.id}`);
+            if (!taskEl) return;
+            
+            const outputEl = document.getElementById(`output-${task.id}`);
+            if (outputEl) {
+                const currentCount = outputEl.querySelectorAll('.task-output-line').length;
+                const newLines = task.output.slice(currentCount);
+                if (newLines.length > 0) {
+                    outputEl.innerHTML += newLines.map(formatOutputLine).join('');
+                    outputEl.scrollTop = outputEl.scrollHeight;
+                }
+            }
+            
+            const statusEl = taskEl.querySelector('.task-status');
+            if (statusEl) {
+                statusEl.className = `task-status status-${task.status}`;
+                statusEl.textContent = getStatusLabel(task.status);
+            }
+        }
+        
+        async function startBuyer() {
+            const btn = document.getElementById('start-buyer');
+            btn.disabled = true;
+            
+            const params = {
+                cookie: '',
+                max_price: document.getElementById('buyer-max-price').value,
+                max_items: document.getElementById('buyer-max-items').value
+            };
+            
+            try {
+                const response = await fetch('/api/tasks/buyer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                const data = await response.json();
+                await loadTask(data.task_id);
+                streamTaskOutput(data.task_id);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+            
+            btn.disabled = false;
+        }
+        
+        async function startAustin() {
+            const btn = document.getElementById('start-austin');
+            btn.disabled = true;
+            
+            const params = {
+                cookie: '',
+                max_price: document.getElementById('austin-max-price').value,
+                max_pages: document.getElementById('austin-max-pages').value,
+                max_items: document.getElementById('austin-max-items').value
+            };
+            
+            try {
+                const response = await fetch('/api/tasks/charm/austin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                const data = await response.json();
+                await loadTask(data.task_id);
+                streamTaskOutput(data.task_id);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+            
+            btn.disabled = false;
+        }
+        
+        async function startBudapest() {
+            const btn = document.getElementById('start-budapest');
+            btn.disabled = true;
+            
+            const params = {
+                cookie: '',
+                max_price: document.getElementById('budapest-max-price').value,
+                max_pages: document.getElementById('budapest-max-pages').value,
+                max_items: document.getElementById('budapest-max-items').value
+            };
+            
+            try {
+                const response = await fetch('/api/tasks/charm/budapest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                const data = await response.json();
+                await loadTask(data.task_id);
+                streamTaskOutput(data.task_id);
+            } catch (error) {
+                console.error('Error:', error);
+            }
+            
+            btn.disabled = false;
+        }
+        
+        async function loadTask(taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`);
+                const task = await response.json();
+                tasks[taskId] = task;
+                
+                let containerId;
+                if (task.type === 'buyer') containerId = 'task-list-buyer';
+                else if (task.type === 'charm_austin') containerId = 'task-list-austin';
+                else if (task.type === 'charm_budapest') containerId = 'task-list-budapest';
+                
+                if (containerId) {
+                    renderTask(task, containerId);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        async function loadAllTasks() {
+            try {
+                const response = await fetch('/api/tasks');
+                const taskList = await response.json();
+                taskList.forEach(task => {
+                    tasks[task.id] = task;
+                    
+                    let containerId;
+                    if (task.type === 'buyer') containerId = 'task-list-buyer';
+                    else if (task.type === 'charm_austin') containerId = 'task-list-austin';
+                    else if (task.type === 'charm_budapest') containerId = 'task-list-budapest';
+                    
+                    if (containerId) {
+                        renderTask(task, containerId);
+                    }
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        async function loadHistory() {
+            try {
+                const response = await fetch('/api/history');
+                const history = await response.json();
+                const container = document.getElementById('history-list');
+                
+                if (history.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p>暂无历史记录</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = history.map(task => `
+                    <div class="task-item history-item">
+                        <div class="task-header">
+                            <span class="task-title">${getTaskTypeLabel(task.type)}</span>
+                            <span class="task-status status-${task.status}">${getStatusLabel(task.status)}</span>
+                        </div>
+                        <div class="task-meta">
+                            创建时间: ${task.created_at} | ID: ${task.id}
+                        </div>
+                        <div class="task-output">${task.output.map(formatOutputLine).join('')}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function loadScheduledTasks() {
+            try {
+                const response = await fetch('/api/schedule');
+                const scheduledTasks = await response.json();
+                const container = document.getElementById('schedule-list');
+                
+                if (scheduledTasks.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p>暂无定时任务</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = scheduledTasks.map(task => `
+                    <div class="schedule-item">
+                        <div>
+                            <div style="font-weight: bold; margin-bottom: 6px;">${getTaskTypeLabel(task.type === 'austin' ? 'charm_austin' : task.type === 'budapest' ? 'charm_budapest' : task.type)}</div>
+                            <div style="color: var(--text-muted); font-size: 0.9em;">Cron: ${task.cron}</div>
+                            <div style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px;">
+                                ${task.next_run ? '下次执行: ' + task.next_run : ''}
+                                ${task.last_run ? ' | 上次执行: ' + task.last_run : ''}
+                            </div>
+                        </div>
+                        <button class="btn-delete" onclick="deleteSchedule(${task.id})">删除</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function addSchedule() {
+            const type = document.getElementById('schedule-type').value;
+            const cron = document.getElementById('schedule-cron').value.trim();
+            
+            if (!cron) {
+                alert('请输入Cron表达式');
+                return;
+            }
+            
+            try {
+                const params = {};
+                if (type === 'buyer') {
+                    params.max_price = document.getElementById('buyer-max-price').value;
+                    params.max_items = document.getElementById('buyer-max-items').value;
+                } else if (type === 'austin') {
+                    params.max_price = document.getElementById('austin-max-price').value;
+                    params.max_pages = document.getElementById('austin-max-pages').value;
+                    params.max_items = document.getElementById('austin-max-items').value;
+                } else if (type === 'budapest') {
+                    params.max_price = document.getElementById('budapest-max-price').value;
+                    params.max_pages = document.getElementById('budapest-max-pages').value;
+                    params.max_items = document.getElementById('budapest-max-items').value;
+                }
+                
+                await fetch('/api/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: type,
+                        cron: cron,
+                        params: params
+                    })
+                });
+                
+                document.getElementById('schedule-cron').value = '';
+                alert('定时任务添加成功！');
+                loadScheduledTasks();
+            } catch (error) {
+                console.error('Error adding schedule:', error);
+                alert('添加定时任务失败');
+            }
+        }
+
+        async function deleteSchedule(taskId) {
+            if (!confirm('确定要删除该定时任务吗？')) {
+                return;
+            }
+            
+            try {
+                await fetch(`/api/schedule/${taskId}`, {
+                    method: 'DELETE'
+                });
+                loadScheduledTasks();
+            } catch (error) {
+                console.error('Error deleting schedule:', error);
+                alert('删除定时任务失败');
+            }
+        }
+        
+        function streamTaskOutput(taskId) {
+            const eventSource = new EventSource(`/api/tasks/${taskId}/stream`);
+            
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.output && tasks[taskId]) {
+                    tasks[taskId].output.push(...data.output);
+                    if (data.status) {
+                        tasks[taskId].status = data.status;
+                    }
+                    updateTask(tasks[taskId]);
+                }
+                
+                if (data.done) {
+                    eventSource.close();
+                    loadTask(taskId);
+                }
+            };
+            
+            eventSource.onerror = function() {
+                eventSource.close();
+            };
+        }
+        
+        function adjustNumber(inputId, delta) {
+            const input = document.getElementById(inputId);
+            let value = parseFloat(input.value) || 0;
+            value = Math.max(parseFloat(input.min) || 0, value + delta);
+            if (input.max) {
+                value = Math.min(parseFloat(input.max), value);
+            }
+            input.value = input.step && input.step.includes('.') ? value.toFixed(2) : Math.round(value);
+        }
+
+        function selectCronExample(select) {
+            const cron = select.value;
+            if (cron) {
+                document.getElementById('schedule-cron').value = cron;
+                document.getElementById('schedule-cron').focus();
+            }
+        }
+        
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            if (tabName === 'history') {
+                loadHistory();
+            }
+            if (tabName === 'schedule') {
+                loadScheduledTasks();
+            }
+        }
+        
+        function showCookieModal() {
+            document.getElementById('cookie-modal').classList.add('active');
+        }
+        
+        function closeCookieModal() {
+            document.getElementById('cookie-modal').classList.remove('active');
+        }
+        
+        function saveCookie() {
+            const cookie = document.getElementById('new-cookie').value;
+            console.log('Cookie saved:', cookie);
+            closeCookieModal();
+        }
+
+        async function clearTasks(type) {
+            if (!confirm('确定要清空该类型的所有任务吗？')) {
+                return;
+            }
+            
+            try {
+                await fetch(`/api/tasks?type=${type}`, {
+                    method: 'DELETE'
+                });
+                
+                let containerId;
+                if (type === 'buyer') containerId = 'task-list-buyer';
+                else if (type === 'austin') containerId = 'task-list-austin';
+                else if (type === 'budapest') containerId = 'task-list-budapest';
+                
+                if (containerId) {
+                    const container = document.getElementById(containerId);
+                    container.innerHTML = '';
+                    
+                    for (const taskId in tasks) {
+                        const task = tasks[taskId];
+                        if ((type === 'buyer' && task.type === 'buyer') ||
+                            (type === 'austin' && task.type === 'charm_austin') ||
+                            (type === 'budapest' && task.type === 'charm_budapest')) {
+                            renderedTaskIds.delete(taskId);
+                            delete tasks[taskId];
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error clearing tasks:', error);
+                alert('清空任务失败');
+            }
+        }
+
+        async function clearHistory() {
+            if (!confirm('确定要清空所有历史记录吗？')) {
+                return;
+            }
+            
+            try {
+                await fetch('/api/history', {
+                    method: 'DELETE'
+                });
+                
+                const container = document.getElementById('history-list');
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>暂无历史记录</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error clearing history:', error);
+                alert('清空历史记录失败');
+            }
+        }
+        
+        function toggleTheme() {
+            const isLight = document.documentElement.classList.toggle('light-theme');
+            const themeIcon = document.getElementById('theme-icon');
+            const themeText = document.getElementById('theme-text');
+            
+            if (isLight) {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = '白天模式';
+                localStorage.setItem('theme', 'light');
+            } else {
+                themeIcon.textContent = '🌙';
+                themeText.textContent = '黑夜模式';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.add('light-theme');
+                document.getElementById('theme-icon').textContent = '☀️';
+                document.getElementById('theme-text').textContent = '白天模式';
+            }
+        }
+        
+        loadTheme();
+        
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+        });
+        
+        document.getElementById('start-buyer').addEventListener('click', startBuyer);
+        document.getElementById('start-austin').addEventListener('click', startAustin);
+        document.getElementById('start-budapest').addEventListener('click', startBudapest);
+        document.getElementById('add-schedule').addEventListener('click', addSchedule);
+        
+        loadAllTasks();
+    </script>
+</body>
+</html>
