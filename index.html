@@ -917,6 +917,9 @@
     </div>
 
     <script>
+        // 配置后端服务器URL
+        const API_BASE_URL = 'https://your-backend-server.com'; // 替换为你的后端服务器地址
+        
         let tasks = {};
         let currentTab = 'buyer';
         let renderedTaskIds = new Set();
@@ -1020,7 +1023,7 @@
             };
             
             try {
-                const response = await fetch('/api/tasks/buyer', {
+                const response = await fetch(`${API_BASE_URL}/api/tasks/buyer`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(params)
@@ -1047,7 +1050,7 @@
             };
             
             try {
-                const response = await fetch('/api/tasks/charm/austin', {
+                const response = await fetch(`${API_BASE_URL}/api/tasks/charm/austin`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(params)
@@ -1074,7 +1077,7 @@
             };
             
             try {
-                const response = await fetch('/api/tasks/charm/budapest', {
+                const response = await fetch(`${API_BASE_URL}/api/tasks/charm/budapest`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(params)
@@ -1091,7 +1094,7 @@
         
         async function loadTask(taskId) {
             try {
-                const response = await fetch(`/api/tasks/${taskId}`);
+                const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`);
                 const task = await response.json();
                 tasks[taskId] = task;
                 
@@ -1110,7 +1113,7 @@
         
         async function loadAllTasks() {
             try {
-                const response = await fetch('/api/tasks');
+                const response = await fetch(`${API_BASE_URL}/api/tasks`);
                 const taskList = await response.json();
                 taskList.forEach(task => {
                     tasks[task.id] = task;
@@ -1131,7 +1134,7 @@
         
         async function loadHistory() {
             try {
-                const response = await fetch('/api/history');
+                const response = await fetch(`${API_BASE_URL}/api/history`);
                 const history = await response.json();
                 const container = document.getElementById('history-list');
                 
@@ -1166,7 +1169,7 @@
 
         async function loadScheduledTasks() {
             try {
-                const response = await fetch('/api/schedule');
+                const response = await fetch(`${API_BASE_URL}/api/schedule`);
                 const scheduledTasks = await response.json();
                 const container = document.getElementById('schedule-list');
                 
@@ -1224,7 +1227,7 @@
                     params.max_items = document.getElementById('budapest-max-items').value;
                 }
                 
-                await fetch('/api/schedule', {
+                await fetch(`${API_BASE_URL}/api/schedule`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1249,7 +1252,7 @@
             }
             
             try {
-                await fetch(`/api/schedule/${taskId}`, {
+                await fetch(`${API_BASE_URL}/api/schedule/${taskId}`, {
                     method: 'DELETE'
                 });
                 loadScheduledTasks();
@@ -1260,7 +1263,7 @@
         }
         
         function streamTaskOutput(taskId) {
-            const eventSource = new EventSource(`/api/tasks/${taskId}/stream`);
+            const eventSource = new EventSource(`${API_BASE_URL}/api/tasks/${taskId}/stream`);
             
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
@@ -1345,7 +1348,7 @@
             }
             
             try {
-                await fetch(`/api/tasks?type=${type}`, {
+                await fetch(`${API_BASE_URL}/api/tasks?type=${type}`, {
                     method: 'DELETE'
                 });
                 
@@ -1380,7 +1383,7 @@
             }
             
             try {
-                await fetch('/api/history', {
+                await fetch(`${API_BASE_URL}/api/history`, {
                     method: 'DELETE'
                 });
                 

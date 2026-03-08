@@ -358,5 +358,15 @@
     "status": "failed",
     "error_message": "购买失败: 页面已过期，请刷新当前页面",
     "attempt_number": 1
+  },
+  {
+    "id": "37500",
+    "name": "封装的涂鸦 | X 双刀 (灰色)",
+    "price": 0.05,
+    "steam_market_url": "https://steamcommunity.com/market/listings/730/Sealed%20Graffiti%20%7C%20X-Knives%20%28Shark%20White%29",
+    "attempt_time": "2026-03-07 20:45:50",
+    "status": "failed",
+    "error_message": "未找到符合价格条件的卖家订单",
+    "attempt_number": 1
   }
 ]

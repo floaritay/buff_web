@@ -3,6 +3,7 @@ BUFF自动化工具 Web应用
 整合三个脚本的功能到Web界面
 """
 from flask import Flask, render_template, request, jsonify, Response
+from flask_cors import CORS
 import threading
 import time
 import json
@@ -12,8 +13,15 @@ import schedule
 from io import StringIO
 from croniter import croniter
 from datetime import datetime
+import dotenv
+
+# 加载环境变量
+dotenv.load_dotenv()
 
 app = Flask(__name__)
+
+# 启用CORS，允许前端从Gitee Pages访问
+CORS(app, resources={r"/*": {"origins": ["*"]}})
 
 tasks = {}
 task_counter = 0
@@ -65,9 +73,11 @@ def run_buyer_task(task_id, params):
         
         if cookie:
             buyer.set_cookie(cookie)
-            save_cookie(cookie)
+            # 存储到环境变量，而不是文件
+            os.environ['BUFF_COOKIE'] = cookie
         else:
-            cookie = load_cookie()
+            # 从环境变量获取cookie
+            cookie = os.environ.get('BUFF_COOKIE', '')
             if cookie:
                 buyer.set_cookie(cookie)
         
@@ -125,9 +135,11 @@ def run_charm_searcher_task(task_id, params, script_type):
         
         if cookie:
             searcher.set_cookie(cookie)
-            save_cookie(cookie)
+            # 存储到环境变量，而不是文件
+            os.environ['BUFF_COOKIE'] = cookie
         else:
-            cookie = load_cookie()
+            # 从环境变量获取cookie
+            cookie = os.environ.get('BUFF_COOKIE', '')
             if cookie:
                 searcher.set_cookie(cookie)
         

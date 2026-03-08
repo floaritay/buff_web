@@ -706,45 +706,22 @@ class BuffBuyer:
 import os
 
 def save_cookie(cookie_str, file_path=None):
-    """保存cookie到文件"""
-    # 使用绝对路径，确保从任何目录运行都能找到文件
-    if file_path is None:
-        try:
-            # 尝试获取脚本所在目录的绝对路径
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-        except Exception:
-            # 如果获取失败，使用当前脚本的绝对路径
-            script_dir = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
-        file_path = os.path.join(script_dir, "cookie.txt")
-    
+    """保存cookie到环境变量"""
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(cookie_str)
-        print(f"Cookie已保存到 {file_path}")
+        # 存储到环境变量
+        os.environ['BUFF_COOKIE'] = cookie_str
+        print("Cookie已保存到环境变量")
     except Exception as e:
         print(f"保存Cookie失败: {e}")
 
 def load_cookie(file_path=None):
-    """从文件加载cookie"""
-    # 使用绝对路径，确保从任何目录运行都能找到文件
-    if file_path is None:
-        try:
-            # 尝试获取脚本所在目录的绝对路径
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-        except Exception:
-            # 如果获取失败，使用当前脚本的绝对路径
-            script_dir = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
-        file_path = os.path.join(script_dir, "cookie.txt")
-    
+    """从环境变量加载cookie"""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            cookie_str = f.read().strip()
+        cookie_str = os.environ.get('BUFF_COOKIE', '')
         if cookie_str:
-            print(f"从 {file_path} 加载Cookie成功")
+            print("从环境变量加载Cookie成功")
             return cookie_str
-        return ""
-    except FileNotFoundError:
-        print(f"{file_path} 文件不存在")
+        print("环境变量中未找到Cookie")
         return ""
     except Exception as e:
         print(f"加载Cookie失败: {e}")
