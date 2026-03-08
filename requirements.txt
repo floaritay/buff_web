@@ -3,3 +3,4 @@ requests>=2.31.0
 schedule>=1.2.0
 croniter>=1.4.0
 flask_cors
+python-dotenv
