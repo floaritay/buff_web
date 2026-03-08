@@ -1364,6 +1364,11 @@
                                             tasks[taskId].status = data.status;
                                         }
                                         updateTask(tasks[taskId]);
+                                        
+                                        // 检查是否需要输入cookie
+                                        if (data.output.some(line => line.includes('登录失败，请检查Cookie'))) {
+                                            showCookieModal();
+                                        }
                                     }
                                     
                                     if (data.done) {
