@@ -2,8 +2,9 @@
 BUFF自动化工具 Web应用
 整合三个脚本的功能到Web界面
 """
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
 from flask_cors import CORS
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import threading
 import time
 import json
@@ -14,14 +15,38 @@ from io import StringIO
 from croniter import croniter
 from datetime import datetime
 import dotenv
+import hashlib
 
 # 加载环境变量
 dotenv.load_dotenv()
 
 app = Flask(__name__)
 
+# 设置密钥
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
+
 # 启用CORS，允许前端从Gitee Pages访问
-CORS(app, resources={r"/*": {"origins": ["*"]}})
+CORS(app, resources={r"/*": {"origins": ["*"]}}, supports_credentials=True)
+
+# 初始化Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+# 模拟用户存储
+users = {}
+user_cookies = {}
+
+# 用户类
+class User(UserMixin):
+    def __init__(self, user_id, username, password_hash):
+        self.id = user_id
+        self.username = username
+        self.password_hash = password_hash
+
+# 用户加载回调
+@login_manager.user_loader
+def load_user(user_id):
+    return users.get(user_id)
 
 tasks = {}
 task_counter = 0
@@ -73,13 +98,15 @@ def run_buyer_task(task_id, params):
         
         if cookie:
             buyer.set_cookie(cookie)
-            # 存储到环境变量，而不是文件
-            os.environ['BUFF_COOKIE'] = cookie
+            # 存储到用户存储空间
+            if current_user.is_authenticated:
+                user_cookies[current_user.id] = cookie
         else:
-            # 从环境变量获取cookie
-            cookie = os.environ.get('BUFF_COOKIE', '')
-            if cookie:
-                buyer.set_cookie(cookie)
+            # 从用户存储空间获取cookie
+            if current_user.is_authenticated:
+                cookie = user_cookies.get(current_user.id, '')
+                if cookie:
+                    buyer.set_cookie(cookie)
         
         if not buyer.test_login():
             print("登录失败，请检查Cookie")
@@ -135,13 +162,15 @@ def run_charm_searcher_task(task_id, params, script_type):
         
         if cookie:
             searcher.set_cookie(cookie)
-            # 存储到环境变量，而不是文件
-            os.environ['BUFF_COOKIE'] = cookie
+            # 存储到用户存储空间
+            if current_user.is_authenticated:
+                user_cookies[current_user.id] = cookie
         else:
-            # 从环境变量获取cookie
-            cookie = os.environ.get('BUFF_COOKIE', '')
-            if cookie:
-                searcher.set_cookie(cookie)
+            # 从用户存储空间获取cookie
+            if current_user.is_authenticated:
+                cookie = user_cookies.get(current_user.id, '')
+                if cookie:
+                    searcher.set_cookie(cookie)
         
         if not searcher.test_login():
             print("登录失败，请检查Cookie")
@@ -384,6 +413,93 @@ def delete_scheduled_task(task_id):
     global scheduled_tasks
     scheduled_tasks = [t for t in scheduled_tasks if t['id'] != task_id]
     return jsonify({'success': True})
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """用户注册"""
+    try:
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'success': False, 'message': '用户名和密码不能为空'}), 400
+        
+        # 检查用户名是否已存在
+        for user in users.values():
+            if user.username == username:
+                return jsonify({'success': False, 'message': '用户名已存在'}), 400
+        
+        # 创建新用户
+        user_id = str(len(users) + 1)
+        password_hash = hashlib.md5(password.encode()).hexdigest()
+        user = User(user_id, username, password_hash)
+        users[user_id] = user
+        user_cookies[user_id] = ''
+        
+        # 登录用户
+        login_user(user)
+        
+        return jsonify({'success': True, 'message': '注册成功', 'user': {'id': user_id, 'username': username}})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """用户登录"""
+    try:
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'success': False, 'message': '用户名和密码不能为空'}), 400
+        
+        # 查找用户
+        for user in users.values():
+            if user.username == username:
+                # 验证密码
+                if user.password_hash == hashlib.md5(password.encode()).hexdigest():
+                    login_user(user)
+                    return jsonify({'success': True, 'message': '登录成功', 'user': {'id': user.id, 'username': user.username}})
+                else:
+                    return jsonify({'success': False, 'message': '密码错误'}), 400
+        
+        return jsonify({'success': False, 'message': '用户不存在'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@login_required
+def logout():
+    """用户注销"""
+    try:
+        logout_user()
+        return jsonify({'success': True, 'message': '注销成功'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/auth/status', methods=['GET'])
+def get_auth_status():
+    """获取认证状态"""
+    if current_user.is_authenticated:
+        return jsonify({'authenticated': True, 'user': {'id': current_user.id, 'username': current_user.username}})
+    else:
+        return jsonify({'authenticated': False})
+
+@app.route('/api/cookie', methods=['POST'])
+@login_required
+def save_cookie_api():
+    """保存cookie到用户存储空间"""
+    try:
+        data = request.json
+        cookie = data.get('cookie', '')
+        if cookie:
+            user_cookies[current_user.id] = cookie
+            return jsonify({'success': True, 'message': 'Cookie保存成功'})
+        return jsonify({'success': False, 'message': 'Cookie不能为空'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 def run_scheduled_task(task_info):
     """执行定时任务"""

@@ -1,8 +1,8 @@
 # 部署指南
 
-本指南说明如何在Gitee Pages上部署前端，并在后端服务器上部署API服务，以确保cookie不被暴露。
+本指南说明如何在Github Pages上部署前端，并在后端服务器上部署API服务，以确保cookie不被暴露。
 
-## 1. 前端部署（Gitee Pages）
+## 1. 前端部署（Github Pages）
 
 ### 步骤1：修改API_BASE_URL
 
@@ -13,39 +13,75 @@
 const API_BASE_URL = 'https://your-backend-server.com'; // 替换为你的后端服务器地址
 ```
 
-### 步骤2：提交前端代码到Gitee
+### 步骤2：提交前端代码到Github
 
-1. 创建一个新的Gitee仓库（或使用现有仓库）
+1. 创建一个新的Github仓库（或使用现有仓库）
 2. 将前端代码（主要是 `index.html` 文件）提交到仓库
-3. 在仓库设置中开启Gitee Pages
+3. 在仓库设置中开启Github Pages
 4. 选择 `index.html` 所在的分支和目录，点击「部署」
 
 ### 步骤3：访问前端
 
-部署完成后，你可以通过Gitee Pages提供的URL访问前端界面。
+部署完成后，你可以通过Github Pages提供的URL访问前端界面。
 
 ## 2. 后端部署（服务器）
 
-### 步骤1：准备服务器
+### 2.1 使用Vercel部署（推荐）
 
-1. 选择一个云服务器（如阿里云、腾讯云、Vercel等）
+#### 步骤1：准备GitHub仓库
+
+1. 创建一个新的GitHub仓库（或使用现有仓库）
+2. 将后端代码（包括 `app.py`、`buff_buyer.py`、`buff_charm_searcher*.py`、`requirements.txt` 等文件）提交到GitHub仓库
+
+#### 步骤2：部署到Vercel
+
+1. 登录Vercel账号（通过GitHub关联登录）
+2. 点击「Add New Project」
+3. 选择你的GitHub仓库
+4. 点击「Import」
+5. 在「Configure Project」页面：
+   - 填写「Project Name」
+   - 在「Build Command」中填写：`pip install -r requirements.txt`
+   - 在「Output Directory」中留空（Vercel会自动处理）
+   - 点击「Deploy」
+
+#### 步骤3：配置环境变量
+
+1. 部署完成后，进入Vercel项目的「Settings」页面
+2. 点击「Environment Variables」
+3. 添加以下环境变量：
+   - `BUFF_COOKIE`：你的BUFF网站Cookie
+   - `FLASK_APP`：`app.py`
+   - `FLASK_ENV`：`production`
+   - `PORT`：`5000`
+4. 点击「Save」
+
+#### 步骤4：获取Vercel部署URL
+
+部署完成后，Vercel会提供一个URL，例如 `https://your-project.vercel.app`，这就是你的后端API地址。
+
+### 2.2 使用其他服务器部署
+
+#### 步骤1：准备服务器
+
+1. 选择一个云服务器（如阿里云、腾讯云等）
 2. 安装Python 3.6+
 3. 安装Git
 
-### 步骤2：克隆代码
+#### 步骤2：克隆代码
 
 ```bash
-git clone https://gitee.com/your-username/your-repo.git
+git clone https://github.com/your-username/your-repo.git
 cd your-repo
 ```
 
-### 步骤3：安装依赖
+#### 步骤3：安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 步骤4：配置环境变量
+#### 步骤4：配置环境变量
 
 1. 复制 `.env.example` 文件为 `.env`：
 
@@ -67,22 +103,22 @@ FLASK_ENV=production
 PORT=5000
 ```
 
-### 步骤5：启动后端服务
+#### 步骤5：启动后端服务
 
-#### 使用Flask内置服务器（仅用于测试）
+##### 使用Flask内置服务器（仅用于测试）
 
 ```bash
 python app.py
 ```
 
-#### 使用Gunicorn（推荐用于生产环境）
+##### 使用Gunicorn（推荐用于生产环境）
 
 ```bash
 pip install gunicorn
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-### 步骤6：配置域名和HTTPS
+#### 步骤6：配置域名和HTTPS
 
 1. 为后端服务器配置域名
 2. 开启HTTPS（推荐使用Let's Encrypt获取免费SSL证书）

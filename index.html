@@ -706,10 +706,17 @@
                     <h1 style="margin-bottom: 5px;">🎮 BUFF自动化工具</h1>
                     <p class="subtitle" style="margin-bottom: 0;">涂鸦购买 · 挂件搜枪 · 历史记录 · 定时任务</p>
                 </div>
-                <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
-                    <span id="theme-icon">🌙</span>
-                    <span id="theme-text">黑夜模式</span>
-                </button>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div id="user-info" style="display: none; align-items: center; gap: 10px;">
+                        <span id="username-display"></span>
+                        <button class="btn" style="padding: 8px 16px; font-size: 0.8em;" onclick="logout()">注销</button>
+                    </div>
+                    <button id="login-btn" class="btn" style="padding: 8px 16px; font-size: 0.8em;" onclick="showLoginModal()">登录</button>
+                    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+                        <span id="theme-icon">🌙</span>
+                        <span id="theme-text">黑夜模式</span>
+                    </button>
+                </div>
             </div>
         </header>
         
@@ -916,13 +923,63 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="login-modal">
+        <div class="modal">
+            <h3>🔐 用户登录</h3>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="login-username" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="login-password" placeholder="请输入密码">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="closeLoginModal()">取消</button>
+                <button class="btn btn-primary" onclick="login()">登录</button>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <span>还没有账号？</span>
+                <a href="#" onclick="switchToRegister()" style="color: var(--primary); cursor: pointer;">立即注册</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="register-modal">
+        <div class="modal">
+            <h3>📝 用户注册</h3>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="register-username" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="register-password" placeholder="请输入密码">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="closeRegisterModal()">取消</button>
+                <button class="btn btn-primary" onclick="register()">注册</button>
+            </div>
+            <div style="margin-top: 15px; text-align: center;">
+                <span>已有账号？</span>
+                <a href="#" onclick="switchToLogin()" style="color: var(--primary); cursor: pointer;">立即登录</a>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 配置后端服务器URL
-        const API_BASE_URL = 'https://your-backend-server.com'; // 替换为你的后端服务器地址
+        const API_BASE_URL = 'https://buff-web-one.vercel.app'; // Vercel部署地址
         
         let tasks = {};
         let currentTab = 'buyer';
         let renderedTaskIds = new Set();
+        let currentUser = null;
+
+        // 页面加载时检查用户状态
+        window.onload = function() {
+            checkAuthStatus();
+        };
         
         function getTaskTypeLabel(type) {
             const labels = {
@@ -1026,7 +1083,8 @@
                 const response = await fetch(`${API_BASE_URL}/api/tasks/buyer`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params)
+                    body: JSON.stringify(params),
+                    credentials: 'include'
                 });
                 const data = await response.json();
                 await loadTask(data.task_id);
@@ -1053,7 +1111,8 @@
                 const response = await fetch(`${API_BASE_URL}/api/tasks/charm/austin`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params)
+                    body: JSON.stringify(params),
+                    credentials: 'include'
                 });
                 const data = await response.json();
                 await loadTask(data.task_id);
@@ -1080,7 +1139,8 @@
                 const response = await fetch(`${API_BASE_URL}/api/tasks/charm/budapest`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params)
+                    body: JSON.stringify(params),
+                    credentials: 'include'
                 });
                 const data = await response.json();
                 await loadTask(data.task_id);
@@ -1094,7 +1154,9 @@
         
         async function loadTask(taskId) {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`);
+                const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
+                credentials: 'include'
+            });
                 const task = await response.json();
                 tasks[taskId] = task;
                 
@@ -1113,7 +1175,9 @@
         
         async function loadAllTasks() {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/tasks`);
+                const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+                credentials: 'include'
+            });
                 const taskList = await response.json();
                 taskList.forEach(task => {
                     tasks[task.id] = task;
@@ -1134,7 +1198,9 @@
         
         async function loadHistory() {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/history`);
+                const response = await fetch(`${API_BASE_URL}/api/history`, {
+                credentials: 'include'
+            });
                 const history = await response.json();
                 const container = document.getElementById('history-list');
                 
@@ -1169,7 +1235,9 @@
 
         async function loadScheduledTasks() {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/schedule`);
+                const response = await fetch(`${API_BASE_URL}/api/schedule`, {
+                credentials: 'include'
+            });
                 const scheduledTasks = await response.json();
                 const container = document.getElementById('schedule-list');
                 
@@ -1234,7 +1302,8 @@
                         type: type,
                         cron: cron,
                         params: params
-                    })
+                    }),
+                    credentials: 'include'
                 });
                 
                 document.getElementById('schedule-cron').value = '';
@@ -1253,7 +1322,8 @@
             
             try {
                 await fetch(`${API_BASE_URL}/api/schedule/${taskId}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
                 loadScheduledTasks();
             } catch (error) {
@@ -1262,29 +1332,54 @@
             }
         }
         
-        function streamTaskOutput(taskId) {
-            const eventSource = new EventSource(`${API_BASE_URL}/api/tasks/${taskId}/stream`);
-            
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
+        async function streamTaskOutput(taskId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/stream`, {
+                    credentials: 'include'
+                });
                 
-                if (data.output && tasks[taskId]) {
-                    tasks[taskId].output.push(...data.output);
-                    if (data.status) {
-                        tasks[taskId].status = data.status;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // 处理SSE格式的数据
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.substring(6);
+                            if (dataStr) {
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    if (data.output && tasks[taskId]) {
+                                        tasks[taskId].output.push(...data.output);
+                                        if (data.status) {
+                                            tasks[taskId].status = data.status;
+                                        }
+                                        updateTask(tasks[taskId]);
+                                    }
+                                    
+                                    if (data.done) {
+                                        await loadTask(taskId);
+                                        return;
+                                    }
+                                } catch (e) {
+                                    console.error('Error parsing SSE data:', e);
+                                }
+                            }
+                        }
                     }
-                    updateTask(tasks[taskId]);
                 }
-                
-                if (data.done) {
-                    eventSource.close();
-                    loadTask(taskId);
-                }
-            };
-            
-            eventSource.onerror = function() {
-                eventSource.close();
-            };
+            } catch (error) {
+                console.error('Error streaming task output:', error);
+            }
         }
         
         function adjustNumber(inputId, delta) {
@@ -1336,9 +1431,21 @@
             document.getElementById('cookie-modal').classList.remove('active');
         }
         
-        function saveCookie() {
+        async function saveCookie() {
             const cookie = document.getElementById('new-cookie').value;
-            console.log('Cookie saved:', cookie);
+            try {
+                // 发送cookie到后端保存
+                await fetch(`${API_BASE_URL}/api/cookie`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cookie: cookie })
+                });
+                console.log('Cookie saved:', cookie);
+                alert('Cookie保存成功！');
+            } catch (error) {
+                console.error('Error saving cookie:', error);
+                alert('Cookie保存失败，请重试');
+            }
             closeCookieModal();
         }
 
@@ -1349,7 +1456,8 @@
             
             try {
                 await fetch(`${API_BASE_URL}/api/tasks?type=${type}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
                 
                 let containerId;
@@ -1384,7 +1492,8 @@
             
             try {
                 await fetch(`${API_BASE_URL}/api/history`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
                 
                 const container = document.getElementById('history-list');
@@ -1399,6 +1508,123 @@
             } catch (error) {
                 console.error('Error clearing history:', error);
                 alert('清空历史记录失败');
+            }
+        }
+
+        // 用户认证相关函数
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/status`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.authenticated) {
+                    currentUser = data.user;
+                    document.getElementById('user-info').style.display = 'flex';
+                    document.getElementById('username-display').textContent = `欢迎，${data.user.username}`;
+                    document.getElementById('login-btn').style.display = 'none';
+                } else {
+                    currentUser = null;
+                    document.getElementById('user-info').style.display = 'none';
+                    document.getElementById('login-btn').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+            }
+        }
+
+        function showLoginModal() {
+            document.getElementById('login-modal').classList.add('active');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('login-modal').classList.remove('active');
+        }
+
+        function showRegisterModal() {
+            document.getElementById('register-modal').classList.add('active');
+        }
+
+        function closeRegisterModal() {
+            document.getElementById('register-modal').classList.remove('active');
+        }
+
+        function switchToRegister() {
+            closeLoginModal();
+            showRegisterModal();
+        }
+
+        function switchToLogin() {
+            closeRegisterModal();
+            showLoginModal();
+        }
+
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(data.message);
+                    closeLoginModal();
+                    await checkAuthStatus();
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Error logging in:', error);
+                alert('登录失败，请重试');
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(data.message);
+                    closeRegisterModal();
+                    await checkAuthStatus();
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Error registering:', error);
+                alert('注册失败，请重试');
+            }
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert(data.message);
+                    await checkAuthStatus();
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Error logging out:', error);
+                alert('注销失败，请重试');
             }
         }
         
