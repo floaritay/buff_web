@@ -75,7 +75,7 @@ class TaskOutputRedirector:
     def flush(self):
         self.original_stdout.flush()
 
-def run_buyer_task(task_id, params):
+def run_buyer_task(task_id, params, user_id):
     """运行购买脚本任务"""
     from buff_buyer import BuffBuyer, load_cookie, load_tried_items, save_tried_items, save_cookie
     
@@ -99,12 +99,12 @@ def run_buyer_task(task_id, params):
         if cookie:
             buyer.set_cookie(cookie)
             # 存储到用户存储空间
-            if current_user.is_authenticated:
-                user_cookies[current_user.id] = cookie
+            if user_id:
+                user_cookies[user_id] = cookie
         else:
             # 从用户存储空间获取cookie
-            if current_user.is_authenticated:
-                cookie = user_cookies.get(current_user.id, '')
+            if user_id:
+                cookie = user_cookies.get(user_id, '')
                 if cookie:
                     buyer.set_cookie(cookie)
         
@@ -133,7 +133,7 @@ def run_buyer_task(task_id, params):
         sys.stdout = redirector.original_stdout
         sys.stderr = redirector.original_stderr
 
-def run_charm_searcher_task(task_id, params, script_type):
+def run_charm_searcher_task(task_id, params, script_type, user_id):
     """运行挂件搜枪脚本任务"""
     redirector = TaskOutputRedirector(task_id)
     sys.stdout = redirector
@@ -163,12 +163,12 @@ def run_charm_searcher_task(task_id, params, script_type):
         if cookie:
             searcher.set_cookie(cookie)
             # 存储到用户存储空间
-            if current_user.is_authenticated:
-                user_cookies[current_user.id] = cookie
+            if user_id:
+                user_cookies[user_id] = cookie
         else:
             # 从用户存储空间获取cookie
-            if current_user.is_authenticated:
-                cookie = user_cookies.get(current_user.id, '')
+            if user_id:
+                cookie = user_cookies.get(user_id, '')
                 if cookie:
                     searcher.set_cookie(cookie)
         
@@ -199,7 +199,22 @@ def run_charm_searcher_task(task_id, params, script_type):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """返回静态的index.html文件"""
+    try:
+        # 打印当前工作目录和文件列表，以便调试
+        import os
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Files in current directory: {os.listdir('.')}")
+        
+        # 尝试读取index.html文件
+        with open('index.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content
+    except Exception as e:
+        # 打印详细的错误信息
+        import traceback
+        traceback.print_exc()
+        return f"Error: {e}", 500
 
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
@@ -218,6 +233,9 @@ def start_buyer_task():
     global task_counter
     params = request.json
     
+    # 获取当前用户ID
+    user_id = current_user.id if current_user.is_authenticated else None
+    
     with task_lock:
         task_counter += 1
         task_id = f"buyer_{task_counter}"
@@ -230,7 +248,7 @@ def start_buyer_task():
             'created_at': time.strftime('%Y-%m-%d %H:%M:%S')
         }
     
-    thread = threading.Thread(target=run_buyer_task, args=(task_id, params))
+    thread = threading.Thread(target=run_buyer_task, args=(task_id, params, user_id))
     thread.daemon = True
     thread.start()
     
@@ -240,6 +258,9 @@ def start_buyer_task():
 def start_austin_task():
     global task_counter
     params = request.json
+    
+    # 获取当前用户ID
+    user_id = current_user.id if current_user.is_authenticated else None
     
     with task_lock:
         task_counter += 1
@@ -253,7 +274,7 @@ def start_austin_task():
             'created_at': time.strftime('%Y-%m-%d %H:%M:%S')
         }
     
-    thread = threading.Thread(target=run_charm_searcher_task, args=(task_id, params, 'austin'))
+    thread = threading.Thread(target=run_charm_searcher_task, args=(task_id, params, 'austin', user_id))
     thread.daemon = True
     thread.start()
     
@@ -263,6 +284,9 @@ def start_austin_task():
 def start_budapest_task():
     global task_counter
     params = request.json
+    
+    # 获取当前用户ID
+    user_id = current_user.id if current_user.is_authenticated else None
     
     with task_lock:
         task_counter += 1
@@ -276,7 +300,7 @@ def start_budapest_task():
             'created_at': time.strftime('%Y-%m-%d %H:%M:%S')
         }
     
-    thread = threading.Thread(target=run_charm_searcher_task, args=(task_id, params, 'budapest'))
+    thread = threading.Thread(target=run_charm_searcher_task, args=(task_id, params, 'budapest', user_id))
     thread.daemon = True
     thread.start()
     
