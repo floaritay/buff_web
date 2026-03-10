@@ -545,21 +545,46 @@ class BuffCharmSearcher:
             
             # 创建新的会话
             new_session = requests.Session()
-            new_session.headers.update(self.headers)
+            
+            # 更全面的浏览器头信息
+            browser_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Microsoft Edge";v="122"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',
+            }
+            
+            new_session.headers.update(browser_headers)
             
             # 恢复cookie
             for key, value in current_cookies.items():
                 new_session.cookies.set(key, value, domain='buff.163.com', path='/')
             
+            # 访问主页
+            print("访问BUFF主页...")
+            home_response = new_session.get("https://buff.163.com", timeout=15)
+            time.sleep(1.5)
+            
             # 访问市场页面
             market_url = f"https://buff.163.com/market/{self.game}"
-            market_response = new_session.get(market_url, timeout=10)
-            time.sleep(1)
+            print(f"访问市场页面: {market_url}")
+            market_response = new_session.get(market_url, timeout=15)
+            time.sleep(1.5)
             
             # 访问商品页面
             goods_page_url = f"https://buff.163.com/goods/{goods_id}"
-            goods_response = new_session.get(goods_page_url, timeout=10)
-            time.sleep(1)
+            print(f"访问商品页面: {goods_page_url}")
+            goods_response = new_session.get(goods_page_url, timeout=15)
+            time.sleep(1.5)
             
             # 从HTML中提取CSRF token
             csrf_token = ""
@@ -581,7 +606,14 @@ class BuffCharmSearcher:
                     csrf_token = script_match.group(1)
                     print(f"从script标签获取到CSRF token: {csrf_token[:20]}...")
             
-            # 模式3: 从cookie中提取
+            # 模式3: 从script标签的另一种格式提取
+            if not csrf_token:
+                script_match2 = re.search(r'window\.csrf_token\s*=\s*["\']([^"\']+)"\'', html_content)
+                if script_match2:
+                    csrf_token = script_match2.group(1)
+                    print(f"从window.csrf_token获取到CSRF token: {csrf_token[:20]}...")
+            
+            # 模式4: 从cookie中提取
             if not csrf_token:
                 for cookie in new_session.cookies:
                     if cookie.name == 'csrf_token':
@@ -589,11 +621,64 @@ class BuffCharmSearcher:
                         print(f"从cookie获取到CSRF token: {csrf_token[:20]}...")
                         break
             
+            # 模式5: 从HTML中的表单隐藏字段提取
+            if not csrf_token:
+                form_match = re.search(r'<input[^>]+name="csrfmiddlewaretoken"[^>]+value="([^"]+)"', html_content)
+                if form_match:
+                    csrf_token = form_match.group(1)
+                    print(f"从表单隐藏字段获取到CSRF token: {csrf_token[:20]}...")
+            
             if not csrf_token:
                 print("警告: 未能获取CSRF token")
+                # 打印HTML的前1000字符，便于调试
+                print("页面HTML前1000字符:")
+                print(html_content[:1000])
             
             # 获取卖家订单列表，传递charm_id参数
-            sell_orders = self.get_sell_orders(goods_id, charm_id)
+            # 注意：使用新会话获取订单列表
+            print("获取卖家订单列表...")
+            sell_order_url = "https://buff.163.com/api/market/goods/sell_order"
+            sell_order_params = {
+                "game": self.game,
+                "goods_id": goods_id,
+                "page_num": 1,
+                "sort_by": "default",
+                "mode": "",
+                "allow_tradable_cooldown": 1
+            }
+            
+            if charm_id:
+                sell_order_params["charm"] = charm_id
+                print(f"添加charm参数: {charm_id}")
+            
+            # 添加CSRF token到请求头
+            order_headers = {
+                **browser_headers,
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/plain, */*",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "Referer": goods_page_url,
+            }
+            
+            if csrf_token:
+                order_headers["X-CSRFToken"] = csrf_token
+                order_headers["X-CSRF-Token"] = csrf_token
+            
+            sell_order_response = new_session.get(sell_order_url, params=sell_order_params, headers=order_headers, timeout=15)
+            sell_orders = []
+            
+            if sell_order_response.status_code == 200:
+                sell_order_data = sell_order_response.json()
+                if sell_order_data.get('code') == 'OK':
+                    sell_orders = sell_order_data.get('data', {}).get('items', [])
+                    print(f"获取到 {len(sell_orders)} 个卖家订单")
+                else:
+                    print(f"获取卖家订单失败: {sell_order_data.get('msg', '未知错误')}")
+            else:
+                print(f"获取卖家订单请求失败，状态码: {sell_order_response.status_code}")
+                print(f"响应内容: {sell_order_response.text[:200]}...")
             
             if not sell_orders:
                 print("未找到卖家订单")
@@ -637,25 +722,23 @@ class BuffCharmSearcher:
             
             # 添加必要的头信息
             headers = {
-                **self.headers,
+                **browser_headers,
                 "Content-Type": "application/json",
                 "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "zh-CN,zh;q=0.9",
+                "X-Requested-With": "XMLHttpRequest",
                 "Connection": "keep-alive",
                 "Origin": "https://buff.163.com",
-                "Referer": f"https://buff.163.com/goods/{goods_id}",
+                "Referer": goods_page_url,
                 "Sec-Fetch-Dest": "empty",
                 "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-origin",
-                "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Microsoft Edge";v="122"',
-                "Sec-Ch-Ua-Mobile": "?0",
-                "Sec-Ch-Ua-Platform": '"Windows"',
             }
             
             # 如果获取到了CSRF token，添加到请求头
             if csrf_token:
                 headers["X-CSRFToken"] = csrf_token
                 headers["X-CSRF-Token"] = csrf_token
+                headers["Csrf-Token"] = csrf_token
             
             # 尝试购买每个符合条件的订单
             for i, order in enumerate(eligible_orders[:max_orders]):
@@ -680,6 +763,24 @@ class BuffCharmSearcher:
                 # 添加到已尝试列表，避免重复尝试
                 tried_items.append(order_attempt_info)
                 
+                # 再次访问商品页面，确保获取最新的token
+                print("再次访问商品页面以确保token新鲜...")
+                goods_response = new_session.get(goods_page_url, timeout=15)
+                time.sleep(1)
+                
+                # 再次提取CSRF token
+                fresh_csrf_token = csrf_token
+                html_content = goods_response.text
+                meta_match = re.search(r'<meta name="csrf-token" content="([^"]+)"', html_content)
+                if meta_match:
+                    fresh_csrf_token = meta_match.group(1)
+                    print(f"获取到新鲜的CSRF token: {fresh_csrf_token[:20]}...")
+                
+                if fresh_csrf_token:
+                    headers["X-CSRFToken"] = fresh_csrf_token
+                    headers["X-CSRF-Token"] = fresh_csrf_token
+                    headers["Csrf-Token"] = fresh_csrf_token
+                
                 # 发起购买请求
                 buy_url = "https://buff.163.com/api/market/goods/buy"
                 buy_data = {
@@ -697,10 +798,11 @@ class BuffCharmSearcher:
                 }
                 
                 # 发起购买请求
+                print("发起购买请求...")
                 buy_response = new_session.post(buy_url, json=buy_data, headers=headers, timeout=15)
                 
                 print(f"购买请求状态码: {buy_response.status_code}")
-                print(f"购买请求响应: {buy_response.text[:100]}...") # 只显示前100字符
+                print(f"购买请求响应: {buy_response.text[:200]}...") # 显示更多内容便于调试
                 
                 if buy_response.status_code == 200:
                     buy_result = buy_response.json()
@@ -730,7 +832,7 @@ class BuffCharmSearcher:
                                 "page_num": 1,
                                 "status": "pending"
                             }
-                            orders_response = new_session.get(orders_url, params=orders_params, timeout=15)
+                            orders_response = new_session.get(orders_url, params=orders_params, headers=headers, timeout=15)
                             
                             if orders_response.status_code == 200:
                                 orders_data = orders_response.json()
@@ -794,7 +896,7 @@ class BuffCharmSearcher:
                     })
                 
                 # 购买间隔
-                time.sleep(3)
+                time.sleep(4)
                 
         except Exception as e:
             print(f"购买失败: {e}")

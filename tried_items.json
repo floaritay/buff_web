@@ -368,5 +368,35 @@
     "status": "failed",
     "error_message": "未找到符合价格条件的卖家订单",
     "attempt_number": 1
+  },
+  {
+    "id": "36744",
+    "name": "封装的涂鸦 | 美元项链 (棕褐)",
+    "price": 0.06,
+    "steam_market_url": "https://steamcommunity.com/market/listings/730/Sealed%20Graffiti%20%7C%20Bling%20%28Desert%20Amber%29",
+    "attempt_time": "2026-03-10 16:36:38",
+    "status": "failed",
+    "error_message": "未找到符合价格条件的卖家订单",
+    "attempt_number": 1
+  },
+  {
+    "id": "36881",
+    "name": "",
+    "price": 0.06,
+    "steam_market_url": "",
+    "attempt_time": "2026-03-10 17:02:00",
+    "status": "attempted",
+    "order_id": "3978251410-ADA9-153990514",
+    "attempt_number": 1
+  },
+  {
+    "id": "36881",
+    "name": "封装的涂鸦 | 经济局 (群青)",
+    "price": 0.06,
+    "steam_market_url": "https://steamcommunity.com/market/listings/730/Sealed%20Graffiti%20%7C%20Eco%20%28Wire%20Blue%29",
+    "attempt_time": "2026-03-10 17:02:07",
+    "status": "success",
+    "order_id": "260310T3677098842",
+    "attempt_number": 1
   }
 ]

@@ -338,28 +338,93 @@ class BuffBuyer:
         try:
             print(f"尝试购买饰品 ID: {goods_id}, 目标价格: {price}元")
             
-            # 清除旧的 csrf_token cookie，防止多个同名 cookie 导致服务端校验失败
-            old_csrf = [c for c in self.session.cookies if c.name == 'csrf_token']
-            for c in old_csrf:
-                self.session.cookies.clear(c.domain, c.path, c.name)
+            # 完全重新初始化会话，模拟浏览器全新访问
+            print("重新初始化会话以获取最新的CSRF token...")
             
-            # 访问商品页面以获取新的 CSRF token（模拟浏览器行为）
-            print("访问商品页面以刷新CSRF token...")
+            # 保存当前cookie
+            current_cookies = self.session.cookies.get_dict()
+            
+            # 创建新的会话
+            new_session = requests.Session()
+            new_session.headers.update(self.headers)
+            
+            # 恢复cookie
+            for key, value in current_cookies.items():
+                new_session.cookies.set(key, value, domain='buff.163.com', path='/')
+            
+            # 访问市场页面
+            market_url = f"https://buff.163.com/market/{self.game}"
+            market_response = new_session.get(market_url, timeout=10)
+            time.sleep(1)
+            
+            # 访问商品页面
             goods_page_url = f"https://buff.163.com/goods/{goods_id}"
-            self.session.get(goods_page_url, timeout=10)
+            goods_response = new_session.get(goods_page_url, timeout=10)
+            time.sleep(1)
             
-            # 从 session cookies 中提取 CSRF token
+            # 提取CSRF token
             csrf_token = ""
-            for cookie in self.session.cookies:
+            for cookie in new_session.cookies:
                 if cookie.name == 'csrf_token':
                     csrf_token = cookie.value
+                    break
+            
+            if not csrf_token and goods_response.status_code == 200:
+                import re
+                patterns = [
+                    r'csrf_token\s*=\s*["\']([^"\']+)["\']',
+                    r'X-CSRFToken"\s*content="([^"]+)"',
+                    r'csrf-token"\s*content="([^"]+)"',
+                    r'_token\s*=\s*["\']([^"\']+)["\']'
+                ]
+                
+                for pattern in patterns:
+                    csrf_match = re.search(pattern, goods_response.text)
+                    if csrf_match:
+                        csrf_token = csrf_match.group(1)
+                        print(f"从页面内容中获取到CSRF token: {csrf_token[:20]}...")
+                        break
+            
             if csrf_token:
-                print(f"获取到CSRF token: {csrf_token[:20]}...")
+                print(f"使用CSRF token: {csrf_token[:20]}...")
             else:
-                print("警告: 未能从cookies中获取CSRF token")
+                print("警告: 未能获取CSRF token")
             
             # 获取卖家订单列表
-            sell_orders = self.get_sell_orders(goods_id)
+            print("获取卖家订单列表...")
+            sell_order_url = "https://buff.163.com/api/market/goods/sell_order"
+            sell_order_params = {
+                "game": self.game,
+                "goods_id": goods_id
+            }
+            
+            # 添加CSRF token到请求头
+            order_headers = {
+                **self.headers,
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/plain, */*",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "Referer": goods_page_url,
+            }
+            
+            if csrf_token:
+                order_headers["X-CSRFToken"] = csrf_token
+                order_headers["X-CSRF-Token"] = csrf_token
+            
+            sell_order_response = new_session.get(sell_order_url, params=sell_order_params, headers=order_headers, timeout=15)
+            sell_orders = []
+            
+            if sell_order_response.status_code == 200:
+                sell_order_data = sell_order_response.json()
+                if sell_order_data.get('code') == 'OK':
+                    sell_orders = sell_order_data.get('data', {}).get('items', [])
+                    print(f"获取到 {len(sell_orders)} 个卖家订单")
+                else:
+                    print(f"获取卖家订单失败: {sell_order_data.get('msg', '未知错误')}")
+            else:
+                print(f"获取卖家订单请求失败，状态码: {sell_order_response.status_code}")
             
             if not sell_orders:
                 print("未找到卖家订单")
@@ -420,9 +485,13 @@ class BuffBuyer:
                 "Sec-Ch-Ua-Platform": '"Windows"',
             }
             
-            # 如果获取到了CSRF token，添加到请求头
+            # 如果获取到了CSRF token，添加到请求头和cookie
             if csrf_token:
                 headers["X-CSRFToken"] = csrf_token
+                headers["X-XSRF-TOKEN"] = csrf_token
+                headers["CSRF-Token"] = csrf_token
+                new_session.cookies.set('csrf_token', csrf_token, domain='buff.163.com', path='/')
+                new_session.cookies.set('XSRF-TOKEN', csrf_token, domain='buff.163.com', path='/')
             
             # 尝试购买每个符合条件的订单
             for i, order in enumerate(eligible_orders[:max_orders]):
@@ -447,6 +516,25 @@ class BuffBuyer:
                 # 添加到已尝试列表，避免重复尝试
                 tried_items.append(order_attempt_info)
                 
+                # 再次访问商品页面，确保获取最新的token
+                print("再次访问商品页面以确保token新鲜...")
+                goods_response = new_session.get(goods_page_url, timeout=15)
+                time.sleep(1)
+                
+                # 再次提取CSRF token
+                fresh_csrf_token = csrf_token
+                if goods_response.status_code == 200:
+                    import re
+                    meta_match = re.search(r'<meta name="csrf-token" content="([^"]+)"', goods_response.text)
+                    if meta_match:
+                        fresh_csrf_token = meta_match.group(1)
+                        print(f"获取到新鲜的CSRF token: {fresh_csrf_token[:20]}...")
+                
+                if fresh_csrf_token:
+                    headers["X-CSRFToken"] = fresh_csrf_token
+                    headers["X-XSRF-TOKEN"] = fresh_csrf_token
+                    headers["CSRF-Token"] = fresh_csrf_token
+                
                 # 发起购买请求
                 buy_url = "https://buff.163.com/api/market/goods/buy"
                 buy_data = {
@@ -465,10 +553,12 @@ class BuffBuyer:
                 print(json.dumps(buy_data, ensure_ascii=False, indent=2))
                 
                 # 发起购买请求
-                buy_response = self.session.post(buy_url, json=buy_data, headers=headers, timeout=15)
+                buy_response = new_session.post(buy_url, json=buy_data, headers=headers, timeout=15)
                 
                 print(f"购买请求状态码: {buy_response.status_code}")
                 print(f"购买请求响应: {buy_response.text[:100]}...") # 只显示前100字符
+                
+                bill_order_id = None
                 
                 if buy_response.status_code == 200:
                     buy_result = buy_response.json()
@@ -479,8 +569,6 @@ class BuffBuyer:
                         print("请求卖家发送报价...")
                         
                         # 1. 尝试从购买结果中获取订单号
-                        bill_order_id = None
-                        
                         # 尝试不同的字段名
                         possible_fields = ['bill_order_id', 'order_id', 'id'] # ‘id’就可以
                         for field in possible_fields:
@@ -498,7 +586,7 @@ class BuffBuyer:
                                 "page_num": 1,
                                 "status": "pending"
                             }
-                            orders_response = self.session.get(orders_url, params=orders_params, timeout=15)
+                            orders_response = new_session.get(orders_url, params=orders_params, timeout=15)
                             
                             if orders_response.status_code == 200:
                                 orders_data = orders_response.json()
@@ -524,7 +612,7 @@ class BuffBuyer:
                                 "steamid": None
                             }
                             
-                            ask_seller_response = self.session.post(ask_seller_url, json=ask_seller_data, headers=headers, timeout=15)
+                            ask_seller_response = new_session.post(ask_seller_url, json=ask_seller_data, headers=headers, timeout=15)
                             
                             print(f"请求卖家发送报价状态码: {ask_seller_response.status_code}")
                             print(f"请求卖家发送报价响应: {ask_seller_response.text[:300]}...")
@@ -561,8 +649,11 @@ class BuffBuyer:
                         'message': f"购买请求失败，状态码: {buy_response.status_code}"
                     })
                 
+                # 更新主会话的cookie
+                self.session.cookies.update(new_session.cookies)
+                
                 # 购买间隔
-                time.sleep(2)
+                time.sleep(5)  # 增加间隔时间，避免请求过快
                 
         except Exception as e:
             print(f"购买失败: {e}")
