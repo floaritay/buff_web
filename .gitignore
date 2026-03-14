@@ -1,3 +1,5 @@
 cookie.txt
 .env
-
+__pycache__/
+charm_tried_items.json
+tried_items.json
