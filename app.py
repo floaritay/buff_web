@@ -51,7 +51,13 @@ def load_user(user_id):
 tasks = {}
 task_counter = 0
 task_lock = threading.Lock()
-history_file = "task_history.json"
+
+# Vercel 环境下使用 /tmp 目录存储文件
+if os.environ.get('VERCEL') == '1':
+    history_file = "/tmp/task_history.json"
+else:
+    history_file = "task_history.json"
+
 scheduled_tasks = []
 scheduler_running = False
 
@@ -201,20 +207,17 @@ def run_charm_searcher_task(task_id, params, script_type, user_id):
 def index():
     """返回静态的index.html文件"""
     try:
-        # 打印当前工作目录和文件列表，以便调试
-        import os
-        print(f"Current working directory: {os.getcwd()}")
-        print(f"Files in current directory: {os.listdir('.')}")
+        # 获取当前文件所在目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        index_path = os.path.join(current_dir, 'index.html')
         
-        # 尝试读取index.html文件
-        with open('index.html', 'r', encoding='utf-8') as f:
+        with open(index_path, 'r', encoding='utf-8') as f:
             content = f.read()
         return content
     except Exception as e:
-        # 打印详细的错误信息
         import traceback
         traceback.print_exc()
-        return f"Error: {e}", 500
+        return f"Error loading page: {str(e)}", 500
 
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
@@ -317,6 +320,9 @@ def get_task_output(task_id):
 def stream_task_output(task_id):
     def generate():
         last_len = 0
+        timeout_counter = 0
+        max_timeout = 240  # 最多运行2分钟（240次 * 0.5秒）
+        
         while True:
             with task_lock:
                 if task_id not in tasks:
@@ -335,6 +341,10 @@ def stream_task_output(task_id):
                     break
             
             time.sleep(0.5)
+            timeout_counter += 1
+            if timeout_counter > max_timeout:
+                yield f"data: {json.dumps({'done': True, 'status': 'timeout'})}\n\n"
+                break
     
     return Response(generate(), mimetype='text/event-stream')
 
@@ -603,9 +613,9 @@ def run_scheduler():
         time.sleep(30)
 
 if __name__ == '__main__':
-    os.makedirs('templates', exist_ok=True)
-    
-    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-    scheduler_thread.start()
+    # 本地开发环境启动调度器
+    if os.environ.get('VERCEL') != '1':
+        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+        scheduler_thread.start()
     
     app.run(debug=True, host='0.0.0.0', port=5000)
