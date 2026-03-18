@@ -100,19 +100,17 @@ def run_buyer_task(task_id, params, user_id):
         max_items = int(params.get('max_items', 10))
         cookie = params.get('cookie', '')
         
+        # 如果没有提供cookie，从环境变量获取
+        if not cookie:
+            cookie = os.environ.get('BUFF_COOKIE', '')
+        
         buyer = BuffBuyer(game="csgo")
         
         if cookie:
             buyer.set_cookie(cookie)
-            # 存储到用户存储空间
-            if user_id:
-                user_cookies[user_id] = cookie
+            print(f"已设置Cookie: {cookie[:30]}...")
         else:
-            # 从用户存储空间获取cookie
-            if user_id:
-                cookie = user_cookies.get(user_id, '')
-                if cookie:
-                    buyer.set_cookie(cookie)
+            print("警告: 未提供Cookie")
         
         if not buyer.test_login():
             print("登录失败，请检查Cookie")
@@ -522,18 +520,42 @@ def get_auth_status():
         return jsonify({'authenticated': False})
 
 @app.route('/api/cookie', methods=['POST'])
-@login_required
 def save_cookie_api():
-    """保存cookie到用户存储空间"""
+    """保存cookie - Vercel环境下使用环境变量"""
     try:
         data = request.json
         cookie = data.get('cookie', '')
         if cookie:
-            user_cookies[current_user.id] = cookie
+            # 在 Vercel 环境下保存到环境变量（临时）
+            if os.environ.get('VERCEL') == '1':
+                os.environ['BUFF_COOKIE'] = cookie
+            else:
+                # 本地环境保存到文件
+                with open('cookie.txt', 'w', encoding='utf-8') as f:
+                    f.write(cookie)
             return jsonify({'success': True, 'message': 'Cookie保存成功'})
         return jsonify({'success': False, 'message': 'Cookie不能为空'}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/cookie', methods=['GET'])
+def get_cookie_api():
+    """获取当前保存的cookie"""
+    try:
+        # Vercel 环境从环境变量读取
+        if os.environ.get('VERCEL') == '1':
+            cookie = os.environ.get('BUFF_COOKIE', '')
+        else:
+            # 本地环境从文件读取
+            cookie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookie.txt')
+            if os.path.exists(cookie_path):
+                with open(cookie_path, 'r', encoding='utf-8') as f:
+                    cookie = f.read().strip()
+            else:
+                cookie = ''
+        return jsonify({'cookie': cookie[:20] + '...' if len(cookie) > 20 else cookie})
+    except Exception as e:
+        return jsonify({'cookie': '', 'error': str(e)})
 
 def run_scheduled_task(task_info):
     """执行定时任务"""

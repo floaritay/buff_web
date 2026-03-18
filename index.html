@@ -1074,7 +1074,7 @@
             btn.disabled = true;
             
             const params = {
-                cookie: '',
+                cookie: localStorage.getItem('buff_cookie') || '',
                 max_price: document.getElementById('buyer-max-price').value,
                 max_items: document.getElementById('buyer-max-items').value
             };
@@ -1101,7 +1101,7 @@
             btn.disabled = true;
             
             const params = {
-                cookie: '',
+                cookie: localStorage.getItem('buff_cookie') || '',
                 max_price: document.getElementById('austin-max-price').value,
                 max_pages: document.getElementById('austin-max-pages').value,
                 max_items: document.getElementById('austin-max-items').value
@@ -1129,7 +1129,7 @@
             btn.disabled = true;
             
             const params = {
-                cookie: '',
+                cookie: localStorage.getItem('buff_cookie') || '',
                 max_price: document.getElementById('budapest-max-price').value,
                 max_pages: document.getElementById('budapest-max-pages').value,
                 max_items: document.getElementById('budapest-max-items').value
@@ -1438,18 +1438,26 @@
         
         async function saveCookie() {
             const cookie = document.getElementById('new-cookie').value;
+            if (!cookie.trim()) {
+                alert('请输入Cookie');
+                return;
+            }
+            
+            // 保存到 localStorage
+            localStorage.setItem('buff_cookie', cookie);
+            console.log('Cookie saved to localStorage');
+            
             try {
-                // 发送cookie到后端保存
+                // 同时发送到后端保存
                 await fetch(`${API_BASE_URL}/api/cookie`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ cookie: cookie })
                 });
-                console.log('Cookie saved:', cookie);
                 alert('Cookie保存成功！');
             } catch (error) {
-                console.error('Error saving cookie:', error);
-                alert('Cookie保存失败，请重试');
+                console.error('Error saving cookie to backend:', error);
+                alert('Cookie已保存到本地！（后端保存失败）');
             }
             closeCookieModal();
         }
