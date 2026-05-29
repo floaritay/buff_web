@@ -1,146 +1,192 @@
-# BUFF饰品自动化工具集
+# BUFF 饰品自动化购买工具集
 
-## 项目介绍
+自动化购买 [BUFF](https://buff.163.com) 低价饰品的工具集，支持三种购买模式。
 
-BUFF饰品自动化工具集是一套用于BUFF网站饰品交易的自动化脚本，包含两个主要工具：
+## 工具一览
 
-1. **BUFF饰品购买脚本** (`buff_buyer.py`) - 自动筛选并购买低价涂鸦饰品
-2. **BUFF挂件搜枪脚本** (`buff_charm_searcher.py`) - 自动查找带有特定挂件的低价枪械饰品
+| 工具 | 脚本 | 功能 |
+|------|------|------|
+| 指定饰品购买 | `item_buyer.py` | 传入 goods_id，按价格阈值购买 |
+| 涂鸦饰品购买 | `buff_buyer.py` | 自动筛选低价涂鸦并购买 |
+| 挂件搜枪 (Austin) | `buff_charm_searcher_austin.py` | 查找带 Austin 挂件的低价枪械并购买 |
+| 挂件搜枪 (Budapest) | `buff_charm_searcher_budapest.py` | 查找带 Budapest 挂件的低价枪械并购买 |
 
-## 功能特点
-
-### BUFF饰品购买脚本 (`buff_buyer.py`)
-- ✅ 自动登录BUFF网站（使用Cookie）
-- ✅ 筛选涂鸦类饰品
-- ✅ 查找价格≤5分钱的饰品
-- ✅ 使用BUFF可用资金购买
-- ✅ 购买后自动请求卖家发送报价
-- ✅ 自动保存和加载Cookie
-- ✅ 记录已尝试购买的商品，避免重复尝试
-- ✅ 完善的错误处理和重试机制
-
-### BUFF挂件搜枪脚本 (`buff_charm_searcher.py`)
-- ✅ 自动登录BUFF网站（使用Cookie）
-- ✅ 遍历"挂件（纪念品）"类的所有饰品（共18页）
-- ✅ 自动提取挂件的custom_charm ID
-- ✅ 查找带有该挂件的枪械饰品
-- ✅ 筛选价格<0.3元的枪械饰品
-- ✅ 打印符合条件的饰品信息
-- ✅ 自动保存和加载Cookie
-- ✅ 记录已尝试购买的商品，避免重复尝试
-- ✅ 完善的错误处理和重试机制
-
-## 环境要求
-
-- Python 3.6+
-- 依赖库：
-  - requests
-
-## 安装依赖
+## 安装
 
 ```bash
 pip install requests
 ```
 
-## 使用方法
+## Cookie 获取
 
-### 1. 获取BUFF网站的Cookie
+所有工具共用一个 Cookie，首次运行时会提示输入：
 
-首次运行脚本时，需要手动输入BUFF网站的Cookie。获取方法：
+1. 浏览器登录 buff.163.com
+2. F12 → 网络 → 刷新页面
+3. 复制任意请求的 Cookie 值
 
-1. 在浏览器中登录BUFF网站
-2. 按F12打开开发者工具
-3. 切换到网络标签，刷新页面
-4. 找到任意API请求，复制请求头中的Cookie
-5. 在脚本运行时粘贴Cookie值
+Cookie 保存在 `cookie.txt`，后续运行自动加载。失效时会重新提示。
 
-### 2. 运行脚本
+---
 
-#### 运行BUFF饰品购买脚本
+## 工具 1：指定饰品购买
+
+传入饰品的 goods_id 或商品页面 URL，自动检查卖单并按价格阈值购买。支持所有饰品类型（枪械、贴纸、印花、纪念品等）。
+
+### 获取 goods_id
+
+**方式 1：搜索（推荐）**
+
+```bash
+python item_buyer.py --search "AK-47"
+python item_buyer.py -s "二西莫夫"
+python item_buyer.py -s "二西莫夫 | AK-47"
+python item_buyer.py -s "AK-47" --limit 50   # 返回 50 个搜索结果
+python item_buyer.py -s "AK-47" -l 5         # 返回 5 个搜索结果
+```
+
+会返回匹配的饰品列表，包含 goods_id、最低价、在售数量。
+
+**方式 2：从网站复制**
+
+打开饰品详情页，地址栏中的数字即为 goods_id：
+
+```
+https://buff.163.com/goods/12345  →  goods_id = 12345
+```
+
+### 使用方式
+
+```bash
+# 搜索饰品（默认返回 20 个结果）
+python item_buyer.py --search "AK-47"
+python item_buyer.py -s "二西莫夫"
+
+# 搜索更多结果
+python item_buyer.py -s "AK-47" --limit 50
+
+# 按 ID 购买
+python item_buyer.py 45678 --max-price 5.0 --max-items 3
+
+# 传入完整 URL
+python item_buyer.py --url https://buff.163.com/goods/45678 --max-price 5.0
+
+# 轮询模式：每 30 秒检查一次，无限循环
+python item_buyer.py 45678 --max-price 5.0 --interval 30
+
+# 轮询模式：每 60 秒检查一次，最多 20 轮
+python item_buyer.py 45678 --max-price 5.0 --interval 60 --max-rounds 20
+```
+
+### 参数说明
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `goods_id` | - | 饰品 ID（与 `--search` 二选一） |
+| `--url` | - | 商品页面 URL |
+| `--search`, `-s` | - | 按名称搜索饰品，获取 goods_id |
+| `--limit`, `-l` | 20 | 搜索结果数量 |
+| `--max-price` | 1.0 | 最大购买价格（元） |
+| `--max-items` | 5 | 单轮最大购买数量 |
+| `--interval` | 0 | 轮询间隔（秒），0=单次运行 |
+| `--max-rounds` | 0 | 最大轮询次数，0=无限 |
+| `--tried-file` | item_tried_items.json | 购买记录文件路径 |
+
+### BAT 快速启动
+
+双击 `start_buy.bat`，按提示输入参数即可。支持选择单次运行或轮询模式。
+
+---
+
+## 工具 2：涂鸦饰品购买
+
+自动筛选 BUFF 上价格 ≤ 0.05 元的涂鸦饰品并批量购买。
 
 ```bash
 python buff_buyer.py
 ```
 
 脚本会自动：
-- 尝试加载保存的Cookie
-- 如果Cookie无效，提示输入新的Cookie
-- 开始搜索和购买价格≤5分钱的涂鸦饰品
-- 最多购买10个饰品
+- 筛选涂鸦类饰品（按分类和关键词过滤）
+- 查找价格 ≤ 0.05 元的涂鸦
+- 逐个购买，每个最多尝试 5 个卖单
+- 购买后自动请求卖家发送 Steam 报价
+- 修改价格和最大数量需要在文件最后手动修改
+---
 
-#### 运行BUFF挂件搜枪脚本
+## 工具 3：挂件搜枪
+
+遍历指定赛事的所有挂件，对每个挂件执行"挂件搜枪"，查找带有该挂件且价格低于阈值的枪械并购买。
 
 ```bash
-python buff_charm_searcher.py
+# Austin 赛事挂件
+python buff_charm_searcher_austin.py
+
+# Budapest 赛事挂件
+python buff_charm_searcher_budapest.py
 ```
 
 脚本会自动：
-- 尝试加载保存的Cookie
-- 如果Cookie无效，提示输入新的Cookie
-- 遍历18页挂件饰品
-- 对每个挂件执行"挂件搜枪"操作
-- 查找价格<0.3元的带有该挂件的枪械饰品
-- 最多购买5个符合条件的饰品
+- 遍历所有挂件（Austin 18 页，Budapest 15 页）
+- 提取每个挂件的 custom_charm_id
+- 搜索带有该挂件的在售枪械
+- 筛选价格 < 0.3 元的枪械并购买
+- 修改价格和最大数量需要在文件最后手动修改
 
-## 配置说明
+### 添加新赛事
 
-### BUFF饰品购买脚本配置
+在 `buff/config.py` 的 `CHARM_EVENTS` 中添加新条目：
 
-在 `buff_buyer.py` 的 `run` 方法中可以修改以下参数：
-
-- `max_price`：最大价格，默认为0.05元（5分钱）
-- `max_items`：最大购买数量，默认为10
-
-### BUFF挂件搜枪脚本配置
-
-在 `buff_charm_searcher.py` 的 `run` 方法中可以修改以下参数：
-
-- `max_price`：最大价格，默认为0.3元
-- `max_pages`：最大页数，默认为18页
-- `max_items`：最大购买数量，默认为5
-
-## 文件说明
-
-- `buff_buyer.py` - BUFF饰品购买脚本
-- `buff_charm_searcher.py` - BUFF挂件搜枪脚本
-- `cookie.txt` - 自动保存的Cookie文件
-- `tried_items.json` - 已尝试购买的商品记录（购买脚本）
-- `charm_tried_items.json` - 已尝试购买的商品记录（挂件搜枪脚本）
-
-## 注意事项
-
-1. **Cookie有效期**：BUFF网站的Cookie有一定的有效期，过期后需要重新输入
-2. **购买失败原因**：
-   - 卖家原因无法发送报价
-   - 采用余额购买，不支持支付宝支付的商品
-   - 余额不足
-3. **请求频率**：脚本内置了随机延迟和重试机制，避免请求过于频繁导致被封禁
-4. **网络环境**：请确保网络环境稳定，避免因网络问题导致购买失败
-5. **资金安全**：脚本会严格按照设定的价格范围进行购买，请确保BUFF账户中有足够的余额
-6. **使用风险**：使用自动化脚本可能违反BUFF网站的用户协议，请谨慎使用
-
-## 常见问题
-
-### Q: 脚本提示"Cookie无效或错误"怎么办？
-
-A: 请重新获取BUFF网站的Cookie并输入，确保Cookie包含完整的会话信息。
-
-### Q: 脚本运行后没有找到符合条件的饰品怎么办？
-
-A: 可能是当前市场上没有符合价格条件的饰品，您可以尝试调整价格范围或稍后再运行脚本。
-
-### Q: 购买成功后如何接收饰品？
-
-A: 脚本会自动请求卖家发送报价，您需要在Steam客户端中接受报价。如果自动请求失败，您可以手动在BUFF手机端上请求卖家发送报价。
-
-### Q: 脚本运行过程中出现网络错误怎么办？
-
-A: 脚本内置了错误处理和重试机制，会自动尝试重新连接。如果问题持续，请检查网络连接。
-
-## 免责声明
-
-本工具仅用于学习和研究目的，使用本工具产生的一切后果由使用者自行承担。请遵守BUFF网站的用户协议和相关法律法规。
+```python
+CHARM_EVENTS["new_event"] = CharmEvent(
+    name="new_event",
+    category="csgo_tool_keychain_new_event_2025",
+    default_max_pages=10,
+    tried_items_file="charm_tried_items_new.json",
+)
+```
 
 ---
 
-**温馨提示**：合理使用自动化工具，享受更便捷的饰品交易体验！
+## 文件结构
+
+```
+Buff/
+├── buff/                           # 核心库
+│   ├── __init__.py                 # 包导出
+│   ├── client.py                   # BuffClient 基类（会话、CSRF、购买流程）
+│   ├── buyer.py                    # BuffBuyer（涂鸦购买）
+│   ├── charm_searcher.py           # BuffCharmSearcher（挂件搜枪）
+│   ├── item_buyer.py               # BuffItemBuyer（指定饰品购买）
+│   ├── config.py                   # 赛事配置
+│   └── utils.py                    # Cookie / tried_items 持久化
+├── item_buyer.py                   # 指定饰品购买 CLI
+├── buff_buyer.py                   # 涂鸦购买 CLI
+├── buff_charm_searcher_austin.py   # Austin 挂件搜枪 CLI
+├── buff_charm_searcher_budapest.py # Budapest 挂件搜枪 CLI
+├── start_buy.bat                   # Windows 快速启动
+├── cookie.txt                      # Cookie 存储（自动）
+├── .env                            # 环境变量（可选）
+└── requirements.txt                # 依赖
+```
+
+## 数据文件（自动生成）
+
+| 文件 | 说明 |
+|------|------|
+| `tried_items.json` | 涂鸦购买记录 |
+| `charm_tried_items.json` | Austin 挂件搜枪记录 |
+| `charm_tried_items_budapest.json` | Budapest 挂件搜枪记录 |
+| `item_tried_items.json` | 指定饰品购买记录 |
+| `cookie.txt` | Cookie 存储 |
+
+## 注意事项
+
+1. **请求频率**：脚本内置随机延迟和重试机制，避免被封禁
+2. **购买失败原因**：卖家无法发送报价 / 不支持余额支付 / 余额不足
+3. **Cookie 有效期**：过期后会自动提示重新输入
+4. **使用风险**：自动化脚本可能违反 BUFF 用户协议，请谨慎使用
+
+## 免责声明
+
+本工具仅用于学习和研究目的，使用本工具产生的一切后果由使用者自行承担。

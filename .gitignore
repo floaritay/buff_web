@@ -1,6 +1,11 @@
 cookie.txt
+item_cookie.txt
 .env
 __pycache__/
+buff/__pycache__/
 charm_tried_items.json
+charm_tried_items_budapest.json
+item_tried_items.json
 tried_items.json
 program.md
+DEPLOYMENT.md
