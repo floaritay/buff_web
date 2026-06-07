@@ -1,11 +1,35 @@
+# Secrets
 cookie.txt
 item_cookie.txt
 .env
-__pycache__/
-buff/__pycache__/
-charm_tried_items.json
-charm_tried_items_budapest.json
-item_tried_items.json
-tried_items.json
+
+# Generated data
+*.json
+*.db
+*.db-shm
+*.db-wal
 program.md
-DEPLOYMENT.md
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE / tools
+.claude/
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Misc
+data/
+old/

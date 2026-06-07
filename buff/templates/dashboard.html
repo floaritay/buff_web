@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BUFF // 价格监控系统</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.15);
+  --glass-highlight: rgba(255, 255, 255, 0.12);
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-dim: rgba(255, 255, 255, 0.35);
+  --accent-blue: #60a5fa;
+  --accent-green: #34d399;
+  --accent-red: #f87171;
+  --accent-amber: #fbbf24;
+  --accent-purple: #a78bfa;
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --blur: 24px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  background: #0a0a12;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(99, 102, 241, 0.15), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 85% 15%, rgba(139, 92, 246, 0.12), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 50% 80%, rgba(14, 165, 233, 0.1), transparent 50%),
+    radial-gradient(ellipse 40% 30% at 20% 70%, rgba(52, 211, 153, 0.06), transparent 40%),
+    linear-gradient(180deg, #0a0a12 0%, #0d0d1a 50%, #0a0a12 100%);
+  background-attachment: fixed;
+}
+
+/* ── Noise texture overlay ────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Layout ────────────────────────────────────────────────── */
+.shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 28px 36px 60px;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 32px;
+  margin-bottom: 36px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(167, 139, 250, 0.2));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 800;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(135deg, #60a5fa, #a78bfa);
+}
+
+.header-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+}
+
+.header-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  letter-spacing: 0.5px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sys-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--accent-green);
+  padding: 6px 14px;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  border-radius: 100px;
+  backdrop-filter: blur(12px);
+}
+
+.sys-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.sys-clock {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  padding: 6px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  backdrop-filter: blur(12px);
+}
+
+/* ── Section labels ────────────────────────────────────────── */
+.section-label {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  padding-left: 2px;
+}
+
+/* ── Glass panel ───────────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+}
+
+.glass:hover {
+  border-color: var(--glass-border-hover);
+  background: var(--glass-bg-hover);
+}
+
+/* ── Stats row ─────────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-radius: 1px;
+}
+
+.stat-card.blue::before { background: linear-gradient(90deg, var(--accent-blue), transparent 70%); }
+.stat-card.green::before { background: linear-gradient(90deg, var(--accent-green), transparent 70%); }
+.stat-card.red::before { background: linear-gradient(90deg, var(--accent-red), transparent 70%); }
+.stat-card.amber::before { background: linear-gradient(90deg, var(--accent-amber), transparent 70%); }
+
+.stat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-bottom: 14px;
+}
+
+.stat-card.blue .stat-icon { background: rgba(96, 165, 250, 0.1); color: var(--accent-blue); }
+.stat-card.green .stat-icon { background: rgba(52, 211, 153, 0.1); color: var(--accent-green); }
+.stat-card.red .stat-icon { background: rgba(248, 113, 113, 0.1); color: var(--accent-red); }
+.stat-card.amber .stat-icon { background: rgba(251, 191, 36, 0.1); color: var(--accent-amber); }
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-family: var(--font-heading);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+.stat-card.blue .stat-value { color: var(--accent-blue); }
+.stat-card.green .stat-value { color: var(--accent-green); }
+.stat-card.red .stat-value { color: var(--accent-red); }
+.stat-card.amber .stat-value { color: var(--accent-amber); }
+
+.stat-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ── Panel inner ───────────────────────────────────────────── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.panel-title {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  opacity: 0.6;
+}
+
+.panel-body {
+  padding: 20px 22px;
+}
+
+/* ── Chart ─────────────────────────────────────────────────── */
+.chart-wrap {
+  height: 210px;
+  position: relative;
+}
+
+/* ── Tools ─────────────────────────────────────────────────── */
+.tools-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.tool-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.tool-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.tool-card.active {
+  background: rgba(96, 165, 250, 0.08);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.tool-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(167, 139, 250, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  color: var(--accent-blue);
+}
+
+.tool-info h3 {
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.tool-info p {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ── Tool form ─────────────────────────────────────────────── */
+.tool-form-wrap {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tool-form-wrap.open {
+  max-height: 500px;
+}
+
+.tool-form {
+  padding: 20px 22px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-field.full {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.form-field input[type="text"],
+.form-field input[type="number"] {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 9px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.form-field input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.form-field .checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+}
+
+.form-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.form-field .cb-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.btn {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-run {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(52, 211, 153, 0.08));
+  color: var(--accent-green);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.btn-run:hover {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.25), rgba(52, 211, 153, 0.12));
+  box-shadow: 0 4px 16px rgba(52, 211, 153, 0.15);
+  transform: translateY(-1px);
+}
+
+.btn-stop {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.15), rgba(248, 113, 113, 0.08));
+  color: var(--accent-red);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.btn-stop:hover {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.25), rgba(248, 113, 113, 0.12));
+  box-shadow: 0 4px 16px rgba(248, 113, 113, 0.15);
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-cancel:hover {
+  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ── Log panel ─────────────────────────────────────────────── */
+.log-section {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.log-section.open {
+  max-height: 500px;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 22px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.log-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.status-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+}
+
+.status-chip.running {
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--accent-green);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  animation: blink-chip 1.5s ease-in-out infinite;
+}
+
+.status-chip.finished {
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--accent-blue);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.status-chip.stopped {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--accent-amber);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+@keyframes blink-chip {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.log-output {
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid var(--glass-border);
+  padding: 16px 22px;
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  max-height: 320px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-dim);
+}
+
+.log-line.error { color: var(--accent-red); }
+.log-line.success { color: var(--accent-green); }
+.log-line.warn { color: var(--accent-amber); }
+
+/* ── Tables ────────────────────────────────────────────────── */
+.table-scroll {
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  text-align: left;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--glass-border);
+  position: sticky;
+  top: 0;
+  background: rgba(10, 10, 18, 0.9);
+  backdrop-filter: blur(12px);
+  z-index: 1;
+}
+
+.data-table td {
+  font-size: 12px;
+  padding: 11px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.data-table tbody tr {
+  transition: background 0.15s;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.data-table .id-col {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent-blue);
+  opacity: 0.7;
+}
+
+.data-table .dim-col {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* ── Badges ────────────────────────────────────────────────── */
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  display: inline-block;
+}
+
+.badge.success {
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--accent-green);
+  border: 1px solid rgba(52, 211, 153, 0.15);
+}
+
+.badge.failed {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--accent-red);
+  border: 1px solid rgba(248, 113, 113, 0.15);
+}
+
+.badge.attempted {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--accent-amber);
+  border: 1px solid rgba(251, 191, 36, 0.15);
+}
+
+/* ── Trend indicators ──────────────────────────────────────── */
+.trend {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.trend.down { color: var(--accent-green); }
+.trend.up { color: var(--accent-red); }
+.trend.flat { color: var(--text-dim); }
+
+/* ── Empty state ───────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .shell { padding: 16px 20px 40px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .stats-row { grid-template-columns: 1fr; }
+  .header { flex-direction: column; gap: 14px; align-items: flex-start; }
+  .header-right { width: 100%; justify-content: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-mark">B</div>
+      <div>
+        <div class="header-title">BUFF Monitor</div>
+        <div class="header-sub">CS2 饰品自动化购买系统</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="sys-status"><span class="sys-dot"></span> 系统在线</div>
+      <div class="sys-clock" id="sys-clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ── Stats ───────────────────────────────────────────────── -->
+  <div class="section-label">运行数据</div>
+  <div class="stats-row">
+    <div class="glass stat-card blue">
+      <div class="stat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      </div>
+      <div class="stat-label">总购买次数</div>
+      <div class="stat-value" id="s-total">--</div>
+      <div class="stat-sub">所有尝试</div>
+    </div>
+    <div class="glass stat-card green">
+      <div class="stat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div class="stat-label">成功</div>
+      <div class="stat-value" id="s-success">--</div>
+      <div class="stat-sub">已成交</div>
+    </div>
+    <div class="glass stat-card red">
+      <div class="stat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <div class="stat-label">失败</div>
+      <div class="stat-value" id="s-failed">--</div>
+      <div class="stat-sub">未成交</div>
+    </div>
+    <div class="glass stat-card amber">
+      <div class="stat-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="stat-label">总花费</div>
+      <div class="stat-value" id="s-spent">--</div>
+      <div class="stat-sub">人民币 (CNY)</div>
+    </div>
+  </div>
+
+  <!-- ── Chart ─────────────────────────────────────────────────── -->
+  <div class="section-label">每日花费趋势</div>
+  <div class="glass" style="margin-bottom:28px">
+    <div class="panel-body">
+      <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Tools ─────────────────────────────────────────────────── -->
+  <div class="section-label">工具执行</div>
+  <div class="glass" style="overflow:visible;margin-bottom:28px">
+    <div class="panel-body">
+      <div class="tools-grid" id="tools-grid"></div>
+    </div>
+    <div class="tool-form-wrap" id="tool-form-wrap">
+      <div class="tool-form" id="tool-form"></div>
+    </div>
+    <div class="log-section" id="log-section">
+      <div class="log-header">
+        <div class="log-title">
+          运行日志
+          <span class="status-chip running" id="log-status">运行中</span>
+        </div>
+        <button class="btn btn-stop" id="btn-stop" onclick="stopTask()">终止</button>
+      </div>
+      <div class="log-output" id="log-output"></div>
+    </div>
+  </div>
+
+  <!-- ── Monitored items ─────────────────────────────────────── -->
+  <div class="section-label">监控商品</div>
+  <div class="glass">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span> 实时价格监控</div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>名称</th>
+            <th>最新价格</th>
+            <th>最高限价</th>
+            <th>在售数量</th>
+            <th>趋势</th>
+            <th>更新时间</th>
+          </tr>
+        </thead>
+        <tbody id="monitored-body"></tbody>
+      </table>
+      <div class="empty-state" id="monitored-empty" style="display:none">暂无监控商品</div>
+    </div>
+  </div>
+
+  <!-- ── Purchase history ────────────────────────────────────── -->
+  <div class="section-label">购买历史</div>
+  <div class="glass">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span> 交易记录</div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>ID</th>
+            <th>名称</th>
+            <th>价格</th>
+            <th>状态</th>
+            <th>订单号</th>
+          </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+      <div class="empty-state" id="history-empty" style="display:none">暂无购买记录</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Clock ──────────────────────────────────────────────────
+function tickClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('sys-clock').textContent = h + ':' + m + ':' + s;
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+// ── Tools ──────────────────────────────────────────────────
+let currentTaskId = null;
+let currentEventSource = null;
+let activeTool = null;
+
+async function loadTools() {
+  const r = await fetch('/api/tools');
+  const tools = await r.json();
+  const grid = document.getElementById('tools-grid');
+  grid.innerHTML = '';
+
+  const icons = {
+    item_buyer: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    graffiti: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>',
+    charm_searcher: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+  };
+
+  for (const [id, tool] of Object.entries(tools)) {
+    const card = document.createElement('div');
+    card.className = 'tool-card';
+    card.dataset.toolId = id;
+    card.innerHTML =
+      '<div class="tool-icon">' + (icons[id] || '///') + '</div>' +
+      '<div class="tool-info"><h3>' + tool.name + '</h3>' +
+      '<p>' + tool.params.map(p => p.label).join(' · ') + '</p></div>';
+    card.addEventListener('click', () => openToolForm(id, tool));
+    grid.appendChild(card);
+  }
+}
+
+function openToolForm(toolId, tool) {
+  const wrap = document.getElementById('tool-form-wrap');
+  const form = document.getElementById('tool-form');
+
+  if (activeTool === toolId) {
+    wrap.classList.remove('open');
+    document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+    activeTool = null;
+    return;
+  }
+
+  activeTool = toolId;
+  document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+  document.querySelector('[data-tool-id="' + toolId + '"]').classList.add('active');
+
+  let html = '<div class="form-grid">';
+  for (const p of tool.params) {
+    const inputId = 'p-' + toolId + '-' + p.name;
+    if (p.type === 'checkbox') {
+      html += '<div class="form-field full"><div class="checkbox-wrap">' +
+        '<input type="checkbox" id="' + inputId + '">' +
+        '<span class="cb-label" onclick="document.getElementById(\'' + inputId + '\').click()">' + p.label + '</span>' +
+        '</div></div>';
+    } else {
+      const req = p.required ? ' required' : '';
+      const def = p.default ? ' value="' + p.default + '"' : '';
+      html += '<div class="form-field"><label>' + p.label + '</label>' +
+        '<input type="text" id="' + inputId + '"' + def + req + '></div>';
+    }
+  }
+  html += '</div>';
+  html += '<div class="form-actions">' +
+    '<button class="btn btn-run" onclick="runTool(\'' + toolId + '\')">执行</button>' +
+    '<button class="btn btn-cancel" onclick="closeToolForm()">取消</button></div>';
+
+  form.innerHTML = html;
+  wrap.classList.add('open');
+}
+
+function closeToolForm() {
+  document.getElementById('tool-form-wrap').classList.remove('open');
+  document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+  activeTool = null;
+}
+
+async function runTool(toolId) {
+  const r = await fetch('/api/tools');
+  const tools = await r.json();
+  const tool = tools[toolId];
+
+  const body = { tool: toolId };
+  for (const p of tool.params) {
+    const el = document.getElementById('p-' + toolId + '-' + p.name);
+    if (p.type === 'checkbox') {
+      if (el.checked) body[p.name] = true;
+    } else {
+      const val = el.value.trim();
+      if (p.required && !val) { alert('请填写: ' + p.label); return; }
+      if (val) body[p.name] = val;
+    }
+  }
+
+  const resp = await fetch('/api/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json();
+  if (data.error) { alert(data.error); return; }
+
+  currentTaskId = data.task_id;
+  closeToolForm();
+  showLog();
+  streamLog(data.task_id);
+}
+
+function showLog() {
+  const section = document.getElementById('log-section');
+  const output = document.getElementById('log-output');
+  const status = document.getElementById('log-status');
+
+  section.classList.add('open');
+  output.innerHTML = '';
+  status.textContent = '运行中';
+  status.className = 'status-chip running';
+  document.getElementById('btn-stop').style.display = '';
+  document.getElementById('btn-stop').disabled = false;
+}
+
+function streamLog(taskId) {
+  if (currentEventSource) currentEventSource.close();
+  const output = document.getElementById('log-output');
+  const status = document.getElementById('log-status');
+  const btnStop = document.getElementById('btn-stop');
+
+  const es = new EventSource('/api/run/' + taskId + '/stream');
+  currentEventSource = es;
+
+  es.onmessage = function(e) {
+    const d = JSON.parse(e.data);
+    if (d.line) {
+      const atBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 50;
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      if (d.line.includes('[错误]') || d.line.includes('ERROR') || d.line.includes('购买失败')) div.classList.add('error');
+      else if (d.line.includes('成功') || d.line.includes('OK')) div.classList.add('success');
+      else if (d.line.includes('警告') || d.line.includes('WARNING')) div.classList.add('warn');
+      div.textContent = d.line;
+      output.appendChild(div);
+      if (atBottom) output.scrollTop = output.scrollHeight;
+    }
+    if (d.status) {
+      es.close();
+      currentEventSource = null;
+      btnStop.style.display = 'none';
+      if (d.status === 'finished') {
+        status.textContent = '已完成';
+        status.className = 'status-chip finished';
+      } else if (d.status === 'stopped') {
+        status.textContent = '已停止';
+        status.className = 'status-chip stopped';
+      } else {
+        status.textContent = '错误';
+        status.className = 'status-chip stopped';
+      }
+      loadStats();
+      loadHistory();
+    }
+  };
+
+  es.onerror = function() {
+    es.close();
+    currentEventSource = null;
+    status.textContent = '连接断开';
+    status.className = 'status-chip stopped';
+    btnStop.style.display = 'none';
+  };
+}
+
+async function stopTask() {
+  if (!currentTaskId) return;
+  const btn = document.getElementById('btn-stop');
+  btn.disabled = true;
+  await fetch('/api/run/' + currentTaskId + '/stop', { method: 'POST' });
+}
+
+// ── Data loading ───────────────────────────────────────────
+
+async function loadStats() {
+  const r = await fetch('/api/stats');
+  const d = await r.json();
+  document.getElementById('s-total').textContent = d.total_attempted;
+  document.getElementById('s-success').textContent = d.total_success;
+  document.getElementById('s-failed').textContent = d.total_failed;
+  document.getElementById('s-spent').textContent = '¥' + (d.total_spent || 0).toFixed(2);
+
+  const labels = (d.daily || []).reverse().map(r => r.day);
+  const data = (d.daily || []).reverse().map(r => r.total || 0);
+  const canvas = document.getElementById('dailyChart');
+  if (canvas._chart) canvas._chart.destroy();
+
+  canvas._chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '花费 (元)',
+        data,
+        backgroundColor: (ctx) => {
+          const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+          g.addColorStop(0, 'rgba(96, 165, 250, 0.5)');
+          g.addColorStop(1, 'rgba(96, 165, 250, 0.05)');
+          return g;
+        },
+        borderColor: 'rgba(96, 165, 250, 0.6)',
+        borderWidth: 1,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(10, 10, 18, 0.9)',
+          titleFont: { family: "'DM Sans'", size: 12 },
+          bodyFont: { family: "'DM Sans'", size: 12 },
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          padding: 12,
+          cornerRadius: 10,
+          displayColors: false,
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: 'rgba(255,255,255,0.3)', font: { family: "'DM Sans'", size: 10 } },
+          border: { display: false }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: { color: 'rgba(255,255,255,0.3)', font: { family: "'DM Sans'", size: 10 } },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+async function loadMonitored() {
+  const r = await fetch('/api/monitored');
+  const items = await r.json();
+  const body = document.getElementById('monitored-body');
+  if (!items.length) {
+    document.getElementById('monitored-empty').style.display = '';
+    body.innerHTML = '';
+    return;
+  }
+  document.getElementById('monitored-empty').style.display = 'none';
+  body.innerHTML = items.map(it => {
+    const trend = it.latest_price && it.latest_price < it.max_price ? 'down' : (it.latest_price > it.max_price ? 'up' : 'flat');
+    const arrow = trend === 'down' ? '↓' : trend === 'up' ? '↑' : '→';
+    return '<tr>' +
+      '<td class="id-col">' + it.goods_id + '</td>' +
+      '<td>' + (it.name || '') + '</td>' +
+      '<td style="font-weight:600">¥' + (it.latest_price || 0).toFixed(2) + '</td>' +
+      '<td class="dim-col">¥' + (it.max_price || 0).toFixed(2) + '</td>' +
+      '<td>' + (it.latest_sell_num || '-') + '</td>' +
+      '<td><span class="trend ' + trend + '">' + arrow + '</span></td>' +
+      '<td class="dim-col">' + (it.latest_recorded || '-') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function loadHistory() {
+  const r = await fetch('/api/history');
+  const items = await r.json();
+  const body = document.getElementById('history-body');
+  if (!items.length) {
+    document.getElementById('history-empty').style.display = '';
+    body.innerHTML = '';
+    return;
+  }
+  document.getElementById('history-empty').style.display = 'none';
+  body.innerHTML = items.map(it => {
+    const cls = it.status === 'success' ? 'success' : it.status === 'failed' ? 'failed' : 'attempted';
+    return '<tr>' +
+      '<td class="dim-col">' + it.bought_at + '</td>' +
+      '<td class="id-col">' + it.goods_id + '</td>' +
+      '<td>' + (it.name || '') + '</td>' +
+      '<td style="font-weight:600">¥' + (it.price || 0).toFixed(2) + '</td>' +
+      '<td><span class="badge ' + cls + '">' + it.status + '</span></td>' +
+      '<td class="dim-col">' + (it.bill_order_id || it.order_id || '-') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ── Init ───────────────────────────────────────────────────
+loadTools();
+loadStats();
+loadMonitored();
+loadHistory();
+</script>
+</body>
+</html>

@@ -12,5 +12,7 @@ from buff.utils import (
     prompt_cookie,
     save_tried_items,
     load_tried_items,
+    make_tried_item,
 )
 from buff.config import CHARM_EVENTS, CharmEvent
+from buff.db import init_db, record_price, record_purchase
