@@ -4,16 +4,20 @@ import json
 import os
 import subprocess
 import threading
+import time
 import uuid
 from collections import deque
 
 from flask import Flask, Response, jsonify, render_template, request
 
 from buff.db import (
+    cache_get,
+    cache_set,
     get_all_monitored,
     get_price_history,
     get_purchase_history,
     get_purchase_stats,
+    get_steam_price_history,
     init_db,
 )
 
@@ -89,12 +93,43 @@ def get_db():
     return _db_conn
 
 
+# ── 市场客户端 ──────────────────────────────────────────────────
+
+_market = None
+_market_ts = 0
+_market_lock = threading.Lock()
+
+_trends_cache = {}  # sort_by -> {"data": [...], "ts": float}
+
+
+def get_market():
+    """懒加载 BuffMarket 实例"""
+    global _market
+    if _market is None:
+        with _market_lock:
+            if _market is None:
+                from buff.client import BuffClient
+                from buff.market import BuffMarket
+                from buff.utils import load_cookie
+                client = BuffClient(quiet=True)
+                cookie = load_cookie()
+                if cookie:
+                    client.set_cookie(cookie)
+                _market = BuffMarket(client)
+    return _market
+
+
 # ── 页面 ────────────────────────────────────────────────────────
 
 
 @app.route("/")
 def index():
     return render_template("dashboard.html", tools=TOOLS)
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return Response(status=204)
 
 
 # ── 数据 API ────────────────────────────────────────────────────
@@ -126,6 +161,66 @@ def api_history():
     offset = request.args.get("offset", 0, type=int)
     history = get_purchase_history(get_db(), limit, offset)
     return jsonify(history)
+
+
+# ── 市场行情 API ────────────────────────────────────────────────
+
+
+@app.route("/api/market/trends")
+def api_market_trends():
+    sort_by = request.args.get("sort_by", "default")
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 20, type=int)
+    search = request.args.get("search", "").strip()
+
+    # 搜索请求不走缓存
+    if not search:
+        cache_key = f"{sort_by}:{page}:{page_size}"
+        cached = _trends_cache.get(cache_key)
+        if cached and time.time() - cached["ts"] < 600:
+            return jsonify({"items": cached["data"], "sort_by": sort_by, "cached": True})
+
+    try:
+        market = get_market()
+        items = market.get_trending_items(sort_by=sort_by, page_num=page, page_size=page_size, search=search)
+        if not items and not search:
+            logger.warning("趋势商品返回空列表 (sort_by=%s)，可能 Cookie 已过期", sort_by)
+        if not search:
+            cache_key = f"{sort_by}:{page}:{page_size}"
+            _trends_cache[cache_key] = {"data": items, "ts": time.time()}
+        return jsonify({"items": items, "sort_by": sort_by, "search": search, "cached": False})
+    except Exception as e:
+        logger.error("市场行情 API 错误: %s", e)
+        return jsonify({"error": str(e), "items": []}), 503
+
+
+@app.route("/api/market/item/<goods_id>")
+def api_market_item(goods_id):
+    try:
+        market = get_market()
+        detail = market.get_item_detail(goods_id)
+        return jsonify({"item": detail})
+    except Exception as e:
+        logger.error("商品详情 API 错误: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/orders")
+def api_orders():
+    order_type = request.args.get("type", "buy")
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 20, type=int)
+
+    try:
+        market = get_market()
+        if order_type == "sell":
+            orders = market.get_sell_orders_history(page_num=page, page_size=page_size)
+        else:
+            orders = market.get_buy_orders(page_num=page, page_size=page_size)
+        return jsonify({"orders": orders, "type": order_type})
+    except Exception as e:
+        logger.error("订单 API 错误: %s", e)
+        return jsonify({"error": str(e), "orders": []}), 500
 
 
 # ── 工具执行 API ────────────────────────────────────────────────

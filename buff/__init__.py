@@ -4,6 +4,7 @@ from buff.client import BuffClient
 from buff.buyer import BuffBuyer
 from buff.charm_searcher import BuffCharmSearcher
 from buff.item_buyer import BuffItemBuyer, parse_goods_id
+from buff.market import BuffMarket
 from buff.utils import (
     save_cookie,
     load_cookie,

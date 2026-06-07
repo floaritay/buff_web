@@ -48,6 +48,25 @@ def init_db(db_path: str = DEFAULT_DB) -> sqlite3.Connection:
 
         CREATE INDEX IF NOT EXISTS idx_price_goods ON price_snapshots(goods_id, recorded_at);
         CREATE INDEX IF NOT EXISTS idx_purchase_goods ON purchase_history(goods_id, bought_at);
+
+        CREATE TABLE IF NOT EXISTS market_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cache_key TEXT NOT NULL,
+            cache_value TEXT NOT NULL,
+            fetched_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_market_cache_key ON market_cache(cache_key, expires_at);
+
+        CREATE TABLE IF NOT EXISTS steam_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goods_id TEXT NOT NULL,
+            steam_price_usd REAL,
+            steam_price_cny REAL,
+            steam_volume INTEGER,
+            recorded_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_steam_goods ON steam_prices(goods_id, recorded_at);
     """)
     conn.commit()
 
@@ -181,5 +200,56 @@ def get_purchase_history(conn: sqlite3.Connection, limit: int = 50, offset: int 
         rows = conn.execute(
             "SELECT * FROM purchase_history ORDER BY bought_at DESC LIMIT ? OFFSET ?",
             (limit, offset),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def cache_get(conn: sqlite3.Connection, cache_key: str) -> Optional[str]:
+    """获取缓存值（未过期则返回，否则返回 None）"""
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    with _lock:
+        row = conn.execute(
+            "SELECT cache_value FROM market_cache WHERE cache_key = ? AND expires_at > ?",
+            (cache_key, now),
+        ).fetchone()
+    return row["cache_value"] if row else None
+
+
+def cache_set(conn: sqlite3.Connection, cache_key: str, value: str, ttl_seconds: int = 3600):
+    """设置缓存值"""
+    try:
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        expires = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + ttl_seconds))
+        with _lock:
+            conn.execute(
+                "INSERT OR REPLACE INTO market_cache (cache_key, cache_value, fetched_at, expires_at) VALUES (?, ?, ?, ?)",
+                (cache_key, value, now, expires),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug("设置缓存失败: %s", e)
+
+
+def record_steam_price(conn: sqlite3.Connection, goods_id: str, usd: float, cny: float, volume: int):
+    """记录 Steam 价格快照"""
+    try:
+        with _lock:
+            conn.execute(
+                "INSERT INTO steam_prices (goods_id, steam_price_usd, steam_price_cny, steam_volume, recorded_at) VALUES (?, ?, ?, ?, ?)",
+                (goods_id, usd, cny, volume, time.strftime("%Y-%m-%d %H:%M:%S")),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug("记录 Steam 价格失败: %s", e)
+
+
+def get_steam_price_history(conn: sqlite3.Connection, goods_id: str, days: int = 30) -> List[Dict]:
+    """获取 Steam 价格历史"""
+    cutoff = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() - days * 86400))
+    with _lock:
+        rows = conn.execute(
+            "SELECT steam_price_usd, steam_price_cny, steam_volume, recorded_at FROM steam_prices "
+            "WHERE goods_id = ? AND recorded_at > ? ORDER BY recorded_at",
+            (goods_id, cutoff),
         ).fetchall()
     return [dict(r) for r in rows]
